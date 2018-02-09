@@ -30,13 +30,13 @@ class CsvIterator implements \Iterator// extends \SplFileObject
 
     public function __construct(CsvBase $dataStore)
     {
-        $filename = $dataStore->getFilename();
+        $filename = $dataStore->filename;
         if (!is_file($filename)) {
             throw new DataStoreException(sprintf('The specified file path "%s" does not exist', $filename));
         }
         $this->splFileObject = new \SplFileObject($filename);
         $this->splFileObject->setFlags(\SplFileObject::READ_CSV);
-        $this->splFileObject->setCsvControl($dataStore->getCsvDelimiter());
+        $this->splFileObject->setCsvControl($dataStore->csvDelimiter);
 
         $this->dataStore = $dataStore;
 

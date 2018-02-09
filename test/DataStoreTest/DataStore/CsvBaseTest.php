@@ -49,7 +49,7 @@ class CsvBaseTest extends AbstractTest
         }
         fclose($fp);
         // Set real column heading because at first created file was empty
-        $this->object->getHeaders();
+        $this->object->columns;
     }
 
     public function testWriteAndReadNullValueAndEmptyString()

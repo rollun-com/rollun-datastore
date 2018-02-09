@@ -6,9 +6,8 @@ use rollun\datastore\DataStore\DataStoreAbstract;
 use rollun\datastore\DataStore\DataStoreException;
 use rollun\datastore\DataStore\Interfaces\DataSourceInterface;
 use rollun\datastore\DataStore\Iterators\CsvIterator;
-use rollun\datastore\DataStore\ConditionBuilder\PhpConditionBuilder;
-use Symfony\Component\Filesystem\LockHandler;
 use Xiag\Rql\Parser\Query;
+use rollun\installer\Command;
 
 class CsvBase extends DataStoreAbstract implements DataSourceInterface
 {
@@ -17,77 +16,95 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
      * Max size of the file in bytes
      */
     const MAX_FILE_SIZE_FOR_CACHE = 8388608;
-    const MAX_LOCK_TRIES = 30;
-    const DEFAULT_DELIMETER = ';';
+    const DEFAULT_CSV_DELIMETER = ';';
 
-    protected $fileHandler;
-    protected $filename;
-    protected $lockHandler;
+    /**
+     *
+     * @var \SplFileObject
+     */
+    protected $splFileObject;
+
+    /**
+     *
+     * @var string
+     */
+    public $filename;
 
     /**
      * Column headings
      * @var mixed array
      */
-    protected $columns;
-    protected $csvDelimiter = self::DEFAULT_DELIMETER;
+    public $columns;
+    public $csvDelimiter;
 
     /**
      * Csv constructor. If file with this name doesn't exist attempts find it in document root directory
      *
      * @param string $filename
-     * @param string $delimiter - csv field delimiter
-     * @param LockHandler $lockHandler
+     * @param string $csvDelimiter - csv field delimiter
      * @throws \rollun\datastore\DataStore\DataStoreException
      */
-    public function __construct($filename, $delimiter, LockHandler $lockHandler)
+    public function __construct($filename, $csvDelimiter = self::DEFAULT_CSV_DELIMETER)
     {
-        // At first checks existing file as it is
-        // If doesn't exist converts to full name in the temporary folder
+        $this->setFilename($filename);
+        $this->csvDelimiter = $csvDelimiter;
+        $this->setColumns();
+    }
+
+    public function getIdentifier()
+    {
+        return $this->columns[0];
+    }
+
+    protected function setFilename($filename)
+    {
         if (is_file($filename)) {
             $this->filename = $filename;
         } else {
-            $this->filename = realpath(sys_get_temp_dir() . DIRECTORY_SEPARATOR . trim($filename, DIRECTORY_SEPARATOR));
-            if (!is_file($this->filename)) {
-                throw new DataStoreException('The specified source file does not exist');
+            $dataDir = Command::getDataDir();
+            $filenameInSDataDir = realpath($dataDir . DIRECTORY_SEPARATOR . trim($filename, DIRECTORY_SEPARATOR));
+            if (is_file($filenameInSDataDir)) {
+                $this->filename = $filenameInSDataDir;
+            } else {
+                throw new \InvalidArgumentException('The specified source file does not exist.' . PHP_EOL . "Filename is $filename");
             }
         }
-        $this->lockHandler = $lockHandler;
-        if (!is_null($delimiter)) {
-            $this->csvDelimiter = $delimiter;
-        }
-        // Sets the column headings
-        $this->getHeaders();
-
-        $this->conditionBuilder = new PhpConditionBuilder();
     }
 
-    public function getFilename()
+    protected function setColumns()
     {
-        return $this->filename;
+        $this->setSplFileObject();
+        $this->lock(LOCK_SH);
+        $this->splFileObject->rewind();
+        $this->columns = $this->splFileObject->current();
+        $this->unsetSplFileObject();
     }
 
-    /**
-     * {@inheritdoc}
-     *
-     * {@inheritdoc}
-     */
+    protected function setSplFileObject()
+    {
+        if (!isset($this->splFileObject)) {
+            $this->splFileObject = new \SplFileObject($this->filename);
+            $this->splFileObject->setFlags(\SplFileObject::READ_CSV | \SplFileObject::READ_AHEAD | \SplFileObject::SKIP_EMPTY | \SplFileObject::DROP_NEW_LINE);
+            $this->splFileObject->setCsvControl($this->csvDelimiter);
+        }
+        return $this->splFileObject;
+    }
+
+    protected function unsetSplFileObject()
+    {
+        $this->unlock();
+        unset($this->splFileObject);
+    }
+
     public function read($id = null)
     {
-        $this->openFile();
-        // In the CSV-format first row always containts the column headings
-        // That's why first row is passed during the file opening
-        // And then it reads the file until end of file won't found or won't found the indentifier
-        $row = null;
-        while (!feof($this->fileHandler)) {
-            $row = $this->getTrueRow(
-                    fgetcsv($this->fileHandler, null, $this->csvDelimiter)
-            );
-            if ($row && $row[$this->getIdentifier()] == $id) {
-                break;
+        $this->setSplFileObject();
+        foreach ($this->splFileObject as $key => $row) {
+            if ($key <> 0 && $row[0] == $id) {
+                return $this->getTrueRow($row);
             }
         }
-        $this->closeFile();
-        return $row;
+        $this->unsetSplFileObject();
     }
 
     /**
@@ -97,7 +114,7 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
      */
     public function getIterator()
     {
-        return new CsvIterator($this, $this->filename, $this->lockHandler);
+        return new CsvIterator($this, $this->filename);
     }
 
     /**
@@ -107,25 +124,25 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
      */
     public function create($itemData, $rewriteIfExist = false)
     {
-        $identifier = $this->getIdentifier();
-        switch (true) {
-            case (!isset($itemData[$identifier])):
-                // There isn't item with identifier in the data set; creates a new item
-                $item = $this->createNewItem($itemData);
-                $item[$identifier] = $this->generatePrimaryKey();
-                break;
-            case (!$rewriteIfExist && !is_null($this->read($itemData[$identifier]))):
-                throw new DataStoreException('Item is already exist with "id" =  ' . $itemData[$identifier]);
-                break;
-            default:
-                // updates an existing item
-                $id = $itemData[$identifier];
-                $this->checkIdentifierType($id);
-                $item = $this->createNewItem($itemData);
-                break;
-        }
-        $this->flush($item);
-        return $item;
+//        $identifier = $this->getIdentifier();
+//        switch (true) {
+//            case (!isset($itemData[$identifier])):
+//                // There isn't item with identifier in the data set; creates a new item
+//                $item = $this->createNewItem($itemData);
+//                $item[$identifier] = $this->generatePrimaryKey();
+//                break;
+//            case (!$rewriteIfExist && !is_null($this->read($itemData[$identifier]))):
+//                throw new DataStoreException('Item is already exist with "id" =  ' . $itemData[$identifier]);
+//                break;
+//            default:
+//                // updates an existing item
+//                $id = $itemData[$identifier];
+//                $this->checkIdentifierType($id);
+//                $item = $this->createNewItem($itemData);
+//                break;
+//        }
+//        $this->flush($item);
+//        return $item;
     }
 
     /**
@@ -135,30 +152,30 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
      */
     public function update($itemData, $createIfAbsent = false)
     {
-        $identifier = $this->getIdentifier();
-        if (!isset($itemData[$identifier])) {
-            throw new DataStoreException('Item must have primary key');
-        }
-        $id = $itemData[$identifier];
-        $this->checkIdentifierType($id);
-        $item = $this->read($id);
-
-        switch (true) {
-            case (is_null($item) && !$createIfAbsent):
-                $errorMsg = sprintf('Can\'t update item with "id" = %s: item does not exist.', $id);
-                throw new DataStoreException($errorMsg);
-            case (is_null($item) && $createIfAbsent):
-                // new item
-                $item = $this->createNewItem($itemData);
-                break;
-        }
-        foreach ($item as $key => &$value) {
-            if (isset($itemData[$key])) {
-                $item[$key] = $itemData[$key];
-            }
-        }
-        $this->flush($item);
-        return $item;
+//        $identifier = $this->getIdentifier();
+//        if (!isset($itemData[$identifier])) {
+//            throw new DataStoreException('Item must have primary key');
+//        }
+//        $id = $itemData[$identifier];
+//        $this->checkIdentifierType($id);
+//        $item = $this->read($id);
+//
+//        switch (true) {
+//            case (is_null($item) && !$createIfAbsent):
+//                $errorMsg = sprintf('Can\'t update item with "id" = %s: item does not exist.', $id);
+//                throw new DataStoreException($errorMsg);
+//            case (is_null($item) && $createIfAbsent):
+//                // new item
+//                $item = $this->createNewItem($itemData);
+//                break;
+//        }
+//        foreach ($item as $key => &$value) {
+//            if (isset($itemData[$key])) {
+//                $item[$key] = $itemData[$key];
+//            }
+//        }
+//        $this->flush($item);
+//        return $item;
     }
 
     /**
@@ -168,122 +185,81 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
      */
     public function delete($id)
     {
-        $this->checkIdentifierType($id);
-        // If item with specified id was found flushs file without it
-        $item = $this->read($id);
-        if (!is_null($item)) {
-            $this->flush($item, true);
-            return $item;
-        }
-        // Else do nothing
+//        $this->checkIdentifierType($id);
+//        // If item with specified id was found flushs file without it
+//        $item = $this->read($id);
+//        if (!is_null($item)) {
+//            $this->flush($item, true);
+//            return $item;
+//        }
+//        // Else do nothing
         return null;
     }
 
-    /**
-     * {@inheritdoc}
-     *
-     * {@inheritdoc}
-     */
-    public function deleteAll()
-    {
-        // Count rows
-        $count = $this->count();
-        $tmpFile = tempnam("/tmp", uniqid() . '.tmp');
-        $tempHandler = fopen($tmpFile, 'w');
-        // Write the headings only and right away closes file
-        fputcsv($tempHandler, $this->columns, $this->csvDelimiter);
-        fclose($tempHandler);
-        // Changes the original file to a temporary one.
-        if (!rename($tmpFile, $this->filename)) {
-            throw new DataStoreException("Failed to write the results to a file.");
-        }
-        return $count;
-    }
-
-    /**
-     * Flushes all changes to temporary file which then will change the original one
-     *
-     * @param $item
-     * @param bool|false $delete
-     * @throws \rollun\datastore\DataStore\DataStoreException
-     */
-    protected function flush($item, $delete = false)
-    {
-        // Create and open temporary file for writing
-        $tmpFile = tempnam(sys_get_temp_dir(), uniqid() . '.tmp');
-        $tempHandler = fopen($tmpFile, 'w');
-        // Write headings
-        fputcsv($tempHandler, $this->columns, $this->csvDelimiter);
-
-        $identifier = $this->getIdentifier();
-        $inserted = false;
-        foreach ($this as $index => $row) {
-            // Check an identifier; if equals and it doesn't need to delete - inserts new item
-            if ($item[$identifier] == $row[$identifier]) {
-                if (!$delete) {
-                    $this->writeRow($tempHandler, $item);
-                }
-                // anyway marks row as inserted
-                $inserted = true;
-            } else {
-                // Just it inserts row from source-file (copying)
-                $this->writeRow($tempHandler, $row);
-            }
-        }
-        // If the same item was not found and changed inserts the new item as the last row in the file
-        if (!$inserted) {
-            $this->writeRow($tempHandler, $item);
-        }
-        fclose($tempHandler);
-        // Copies the original file to a temporary one.
-        if (!copy($tmpFile, $this->filename)) {
-            unlink($tmpFile);
-            throw new DataStoreException("Failed to write the results to a file.");
-        }
-        unlink($tmpFile);
-    }
-
-    /**
-     * Opens file for reading.
-     *
-     * @param bool $seekFirstDataRow - the first row in csv-file contains the column headings; this parameter says,
-     *     if it is need to pass it (row) after the opening the file.
-     * @throws \rollun\datastore\DataStore\DataStoreException
-     */
-    protected function openFile($seekFirstDataRow = true)
-    {
-        $this->lockFile();
-        try {
-            $this->fileHandler = fopen($this->filename, 'r');
-            if ($seekFirstDataRow) {
-                fgets($this->fileHandler);
-            }
-        } catch (\Exception $e) {
-            throw new DataStoreException('Failed to open file. The specified file does not exist or
-                one is closed for reading.');
-        } finally {
-            $this->lockHandler->release();
-        }
-    }
-
-    /**
-     * Locks the file
-     *
-     * @param int $nbTries - count of tries of locking queue
-     * @return bool
-     * @throws \rollun\datastore\DataStore\DataStoreException
-     */
-    protected function lockFile($nbTries = 0)
-    {
-        if (!$this->lockHandler->lock()) {
-            if ($nbTries >= static::MAX_LOCK_TRIES) {
-                throw new DataStoreException('Reach max retry for locking queue file ' . $this->filename);
-            }
-            usleep(10);
-            return $this->lockFile(($nbTries + 1));
-        }
-        return true;
-    }
+//
+//    /**
+//     * {@inheritdoc}
+//     *
+//     * {@inheritdoc}
+//     */
+//    public function deleteAll()
+//    {
+//        // Count rows
+//        $count = $this->count();
+//        $tmpFile = tempnam("/tmp", uniqid() . '.tmp');
+//        $tempHandler = fopen($tmpFile, 'w');
+//        // Write the headings only and right away closes file
+//        fputcsv($tempHandler, $this->columns, $this->csvDelimiter);
+//        fclose($tempHandler);
+//        // Changes the original file to a temporary one.
+//        if (!rename($tmpFile, $this->filename)) {
+//            throw new DataStoreException("Failed to write the results to a file.");
+//        }
+//        return $count;
+//    }
+//
+//    /**
+//     * Flushes all changes to temporary file which then will change the original one
+//     *
+//     * @param $item
+//     * @param bool|false $delete
+//     * @throws \rollun\datastore\DataStore\DataStoreException
+//     */
+//    protected function flush($item, $delete = false)
+//    {
+//        // Create and open temporary file for writing
+//        $tmpFile = tempnam(sys_get_temp_dir(), uniqid() . '.tmp');
+//        $tempHandler = fopen($tmpFile, 'w');
+//        // Write headings
+//        fputcsv($tempHandler, $this->columns, $this->csvDelimiter);
+//
+//        $identifier = $this->getIdentifier();
+//        $inserted = false;
+//        foreach ($this as $index => $row) {
+//            // Check an identifier; if equals and it doesn't need to delete - inserts new item
+//            if ($item[$identifier] == $row[$identifier]) {
+//                if (!$delete) {
+//                    $this->writeRow($tempHandler, $item);
+//                }
+//                // anyway marks row as inserted
+//                $inserted = true;
+//            } else {
+//                // Just it inserts row from source-file (copying)
+//                $this->writeRow($tempHandler, $row);
+//            }
+//        }
+//        // If the same item was not found and changed inserts the new item as the last row in the file
+//        if (!$inserted) {
+//            $this->writeRow($tempHandler, $item);
+//        }
+//        fclose($tempHandler);
+//        // Copies the original file to a temporary one.
+//        if (!copy($tmpFile, $this->filename)) {
+//            unlink($tmpFile);
+//            throw new DataStoreException("Failed to write the results to a file.");
+//        }
+//        unlink($tmpFile);
+//    }
 
     /**
      * {@inheritdoc}
@@ -300,44 +276,24 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
         return $return;
     }
 
-    /**
-     * Closes file
-     */
-    public function closeFile()
-    {
-        fclose($this->fileHandler);
-        $this->lockHandler->release();
-    }
-
-    /**
-     * Sets the column headings
-     * @throws \rollun\datastore\DataStore\DataStoreException
-     */
-    public function getHeaders()
-    {
-        // Don't pass the first row!!
-        $this->openFile(0);
-        $this->columns = fgetcsv($this->fileHandler, null, $this->csvDelimiter);
-        $this->closeFile();
-    }
-
-    /**
-     * Creates a new item, combines data with the column headings
-     * @param $itemData
-     * @return array
-     */
-    protected function createNewItem($itemData)
-    {
-        $item = array_flip($this->columns);
-        foreach ($item as $key => &$value) {
-            if (isset($itemData[$key])) {
-                $item[$key] = $itemData[$key];
-            } else {
-                $item[$key] = null;
-            }
-        }
-        return $item;
-    }
+//
+//    /**
+//     * Creates a new item, combines data with the column headings
+//     * @param $itemData
+//     * @return array
+//     */
+//    protected function createNewItem($itemData)
+//    {
+//        $item = array_flip($this->columns);
+//        foreach ($item as $key => &$value) {
+//            if (isset($itemData[$key])) {
+//                $item[$key] = $itemData[$key];
+//            } else {
+//                $item[$key] = null;
+//            }
+//        }
+//        return $item;
+//    }
 
     /**
      * {@inheritdoc}
@@ -391,6 +347,9 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
      */
     public function writeRow($fHandler, $row)
     {
+        $this->setSplFileObject();
+        $this->lock(LOCK_EX);
+
         array_walk($row, function(&$item, $key) {
             switch (true) {
                 case ('' === $item):
@@ -404,7 +363,7 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
                     break;
             }
         });
-        fputcsv($fHandler, $row, $this->csvDelimiter);
+        $this->unsetSplFileObject();
     }
 
     /**
@@ -414,15 +373,6 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
     protected function generatePrimaryKey()
     {
         return uniqid();
-    }
-
-    /**
-     * Returns the deleimiter of csv fields
-     * @return string
-     */
-    public function getCsvDelimiter()
-    {
-        return $this->csvDelimiter;
     }
 
 }
