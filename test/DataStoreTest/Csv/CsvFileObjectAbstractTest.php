@@ -130,12 +130,26 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(['id', 'val'], $row);
     }
 
-    public function testDeleteRow()
+    public function deleteRowProvider()
     {
-        $count = 10;
+        //$count, $indexForDelete
+        return array(
+            [10, 1],
+            [10, 2],
+            [10, 9],
+            [10, 10],
+                //[100000, 5000],
+        );
+    }
 
-        $indexForDelete = 1;
-
+    /**
+     *
+     * @param int $count
+     * @param int $indexForDelete
+     * @dataProvider deleteRowProvider
+     */
+    public function testDeleteRow($count, $indexForDelete)
+    {
         $rows = array(['id', 'val', 'str']);
         $expectedRows[] = 'shift';
         for ($index = 1; $index <= $count; $index++) {
@@ -166,11 +180,15 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
         if ($indexForDelete - 1 > 0) {
             $this->assertEquals($expectedRows[$indexForDelete - 1], $savedRows[$indexForDelete - 1]);
         }
+        if ($indexForDelete <> $count) {
+            $this->assertEquals($expectedRows[$indexForDelete], $savedRows[$indexForDelete]);
+        }
         if ($indexForDelete + 2 < $count) {
             $this->assertEquals($expectedRows[$indexForDelete + 2], $savedRows[$indexForDelete + 2]);
         }
-        $this->assertEquals($expectedRows[$indexForDelete], $savedRows[$indexForDelete]);
+
         $this->assertEquals($expectedRows[$count - 1], $savedRows[$count - 1]);
+        $this->assertEquals(['id', 'val', 'str'], $csvFileObject->getColumns());
     }
 
 }

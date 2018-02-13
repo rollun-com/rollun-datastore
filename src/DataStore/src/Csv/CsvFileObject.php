@@ -134,10 +134,12 @@ class CsvFileObject extends \SplFileObject
     public function next()
     {
         if (parent::key() === 0 && $this->isCsvMode()) {
+
             parent::current();
             parent::next();
         }
         parent::next();
+        //parent::current();
     }
 
     public function current()
@@ -175,9 +177,10 @@ class CsvFileObject extends \SplFileObject
         $this->csvModeOff();
         $this->lock(LOCK_EX);
 
-        parent::seek($linePos - 1); // I do not know why '-1'
+        parent::seek($linePos - 1);
+        parent::current();
         $charPosTo = $this->ftell();
-        $this->fseek($charPosTo);
+        parent::next();
         parent::current();
         $charPosFrom = $this->ftell();
 
@@ -185,6 +188,7 @@ class CsvFileObject extends \SplFileObject
 
         $this->fflush();
         $this->ftruncate($truncatePos);
+
         $this->restorePrevCsvMode();
         $this->unlock();
     }

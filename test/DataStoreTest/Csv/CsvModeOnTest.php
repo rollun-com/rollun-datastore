@@ -91,19 +91,39 @@ class CsvModeOnTest extends CsvFileObjectAbstractTest
         $csvFileObject->unlock();
     }
 
-    public function testForeach()
+    public function foreachProvider()
+    {
+        //$count
+        return array(
+            [0],
+            [1],
+            [1000],
+        );
+    }
+
+    /**
+     * @dataProvider foreachProvider
+     */
+    public function testForeach($count)
     {
 
-        $csvFileObject = $this->getCsvFileObject();
+        $rows = array(['id', 'val', 'str']);
+        for ($index = 1; $index <= $count; $index++) {
+            $val = $index * 10;
+            $rows[] = [$index, $val, str_repeat($index, rand(1, 1000))]; // rand(1, 100)//1 + $count - $index
+        }
+
+        $csvFileObject = $this->getCsvFileObject($rows);
 
         $csvFileObject->lock(LOCK_SH);
         $savedRows = [];
+        $time = time();
         foreach ($csvFileObject as $key => $row) {
             $savedRows[$key] = $row;
         }
-        $expectedRows = $this->defaultArray;
-        unset($expectedRows[0]); //delete columns names
-
+        var_dump(time() - $time);
+        $expectedRows = $rows;
+        unset($expectedRows[0]); //'id', 'val', 'str'
         $csvFileObject->unlock();
         $this->assertEquals($expectedRows, $savedRows);
     }
