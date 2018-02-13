@@ -132,40 +132,44 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
 
     public function testDeleteRow()
     {
-        $count = 100;
+        $count = 10;
 
-        $indexForDelete = 2;
-        $rows = array(['id', 'val']);
+        $indexForDelete = 1;
+
+        $rows = array(['id', 'val', 'str']);
         $expectedRows[] = 'shift';
-
         for ($index = 1; $index <= $count; $index++) {
             $val = $index * 10;
-            $rows[] = [$index, $val, str_repeat($index, (rand(1, 100)))];
+            $rows[] = [$index, $val, str_repeat($index, rand(1, 1000))]; // rand(1, 100)//1 + $count - $index
             if ($index != $indexForDelete) {
                 $expectedRows[] = $val;
             }
         }
-        unset($expectedRows[0]);
-        $csvFileObject = new CsvFileObject($this->writeDataToCsv($rows), 'r');
+        unset($expectedRows[0]); //'shift'
+        $csvFileObject = $this->getCsvFileObject($rows);
 
         $savedRows = [];
         foreach ($csvFileObject as $key => $row) {
             $savedRows[$key] = $row[1]; //[1];
         }
-        $time = time();
+
         $csvFileObject->deleteRow($indexForDelete);
-        var_dump(time() - $time);
 
         $savedRows = [];
+        $csvFileObject->csvModeOn();
         foreach ($csvFileObject as $key => $row) {
             $savedRows[$key] = $row[1]; //[1];
         }
 
         $this->assertEquals($count - 1, count($savedRows));
         $this->assertEquals($expectedRows[1], $savedRows[1]);
-        $this->assertEquals($expectedRows[$indexForDelete - 1], $savedRows[$indexForDelete - 1]);
+        if ($indexForDelete - 1 > 0) {
+            $this->assertEquals($expectedRows[$indexForDelete - 1], $savedRows[$indexForDelete - 1]);
+        }
+        if ($indexForDelete + 2 < $count) {
+            $this->assertEquals($expectedRows[$indexForDelete + 2], $savedRows[$indexForDelete + 2]);
+        }
         $this->assertEquals($expectedRows[$indexForDelete], $savedRows[$indexForDelete]);
-        $this->assertEquals($expectedRows[$indexForDelete + 2], $savedRows[$indexForDelete + 2]);
         $this->assertEquals($expectedRows[$count - 1], $savedRows[$count - 1]);
     }
 

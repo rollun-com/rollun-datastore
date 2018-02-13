@@ -11,7 +11,7 @@ class CsvFileObject extends \SplFileObject
     /**
      * Buffer size in lines for coping operation
      */
-    const BUFFER_SIZE = 1000;  //i
+    const BUFFER_SIZE = 3;  //i
 
     /**
      * csv mode on - true, csv mode off - false
@@ -192,7 +192,7 @@ class CsvFileObject extends \SplFileObject
     protected function moveRows($charPosFrom, $charPosTo)
     {
         $this->fseek($charPosFrom);
-        while (!$this->eof()) {
+        while ($this->valid()) {
             $this->fseek($charPosFrom);
             parent::current();
 
@@ -205,14 +205,14 @@ class CsvFileObject extends \SplFileObject
 
             $this->fseek($charPosTo);
             foreach ($buffer as $key => $line) {
-                $this->fwrite($line . PHP_EOL);  //$this->fputcsv($line); in csv mode
+                $this->fwrite($line . chr(10));  //$this->fputcsv($line); in csv mode
                 $charPosTo = $this->ftell();
             }
 
             $this->fseek($charPosFrom);
-            parent::current();
-            return $charPosTo;
+            $current = parent::current();
         }
+        return $charPosTo;
     }
 
 }

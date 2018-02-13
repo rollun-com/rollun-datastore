@@ -56,13 +56,6 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
         $row = $csvFileObject->current();
         $csvFileObject->unlock();
         $str = 'id,val';
-        foreach (str_split($str) as $value) {
-            var_dump(ord($value));
-        }
-
-        foreach (str_split($row) as $value) {
-            var_dump(ord($value));
-        }
 
         $this->assertEquals('id,val', $row);
     }
