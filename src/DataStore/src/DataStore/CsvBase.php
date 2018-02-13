@@ -71,15 +71,6 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
         }
     }
 
-    protected function setColumns()
-    {
-        $this->setSplFileObject();
-        $this->lock(LOCK_SH);
-        $this->splFileObject->rewind();
-        $this->columns = $this->splFileObject->current();
-        $this->unsetSplFileObject();
-    }
-
     protected function setSplFileObject()
     {
         if (!isset($this->splFileObject)) {

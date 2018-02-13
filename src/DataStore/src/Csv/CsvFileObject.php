@@ -9,6 +9,18 @@ class CsvFileObject extends \SplFileObject
     const MAX_LOCK_TRIES = 40;
 
     /**
+     * Buffer size in lines for coping operation
+     */
+    const BUFFER_SIZE = 1000;  //i
+
+    /**
+     * csv mode on - true, csv mode off - false
+     *
+     * @var bool
+     */
+    protected $prevCsvMode = null;
+
+    /**
      *
      * @param string $filename
      * @param string $rwMode see 'mode' in http://php.net/manual/en/function.fopen.php
@@ -16,7 +28,7 @@ class CsvFileObject extends \SplFileObject
     public function __construct($filename)
     {
         parent::__construct($filename, 'c+');
-        $this->setFlags(self::READ_CSV | self::READ_AHEAD | self::SKIP_EMPTY | self::DROP_NEW_LINE);
+        $this->csvModeOn();
     }
 
     public function __destruct()
@@ -24,11 +36,44 @@ class CsvFileObject extends \SplFileObject
         $this->unlock();
     }
 
+    public function csvModeOn()
+    {
+        $this->prevCsvMode = $this->isCsvMode();
+        $this->setFlags(self::READ_CSV | \SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY);
+    }
+
+    public function csvModeOff()
+    {
+        $this->prevCsvMode = $this->isCsvMode();
+        $this->setFlags(0 | \SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY);
+    }
+
+    public function isCsvMode()
+    {
+        $flags = $this->getFlags();
+        return (bool) ($flags & self::READ_CSV);
+    }
+
+    public function restorePrevCsvMode()
+    {
+        switch (true) {
+            case $this->prevCsvMode === true:
+                $this->csvModeOn();
+                break;
+            case $this->prevCsvMode === false:
+                $this->csvModeOff();
+                break;
+            default:
+                throw new \RuntimeException('Can not restore CSV mode');
+        }
+        $this->prevCsvMode = null;
+    }
+
     /**
      *
      * @param int  $lockMode LOCK_SH or LOCK_EX
      * @param type $maxTries
-     * @param type $timeout
+     * @param type $timeout in ms
      * @throws DataStoreException
      */
     public function lock($lockMode, $maxTries = null, $lockTriesTimeout = null)
@@ -41,7 +86,6 @@ class CsvFileObject extends \SplFileObject
         }
 
         $count = 0;
-
         while (!$this->flock($lockMode | LOCK_NB, $wouldblock)) {
             if (!$wouldblock) {
                 throw new DataStoreException('There is a problem with file: ' . $this->filename);
@@ -62,7 +106,8 @@ class CsvFileObject extends \SplFileObject
     {
         $this->lock(LOCK_SH);
         parent::rewind();
-        $columns = parent::current();
+        $current = parent::current();
+        $columns = is_array($current) ? $current : trim($current);
         $this->unlock();
         return $columns;
     }
@@ -71,12 +116,15 @@ class CsvFileObject extends \SplFileObject
     {
         parent::rewind();
         parent::current();
-        parent::next();
+        if ($this->isCsvMode()) {
+            parent::next();
+            parent::current();
+        }
     }
 
     public function key()
     {
-        if (parent::key() === 0) {
+        if (parent::key() === 0 && $this->isCsvMode()) {
             parent::current();
             parent::next();
         }
@@ -85,7 +133,7 @@ class CsvFileObject extends \SplFileObject
 
     public function next()
     {
-        if (parent::key() === 0) {
+        if (parent::key() === 0 && $this->isCsvMode()) {
             parent::current();
             parent::next();
         }
@@ -94,7 +142,7 @@ class CsvFileObject extends \SplFileObject
 
     public function current()
     {
-        if (parent::key() === 0) {
+        if (parent::key() === 0 && $this->isCsvMode()) {
             parent::current();
             parent::next();
         }
@@ -103,12 +151,12 @@ class CsvFileObject extends \SplFileObject
         if ([null] === $row) {
             return null;
         }
-        return $row;
+        return is_array($row) ? $row : $row;
     }
 
     public function valid()
     {
-        if (parent::key() === 0) {
+        if (parent::key() === 0 && $this->isCsvMode()) {
             parent::current();
             parent::next();
         }
@@ -116,65 +164,55 @@ class CsvFileObject extends \SplFileObject
             return false;
         }
         $current = parent::current();
-        return $current <> [null];
+        return $current <> [null] && $current <> null;
     }
 
     public function deleteRow($linePos)
     {
-
         if ($linePos === 0) {
             throw new \InvalidArgumentException('Can not delete header of CSV file.');
         }
+        $this->csvModeOff();
         $this->lock(LOCK_EX);
 
-        $startPosForRewrite = $linePos;
-        parent::seek($startPosForRewrite - 1);
+        parent::seek($linePos - 1); // I do not know why '-1'
+        $charPosTo = $this->ftell();
+        $this->fseek($charPosTo);
+        parent::current();
+        $charPosFrom = $this->ftell();
 
-        $startForRewriteInBytes = $this->ftell();
-        $this->fseek($startForRewriteInBytes);
-        $csv1 = parent::current();
+        $truncatePos = $this->moveRows($charPosFrom, $charPosTo);
 
-        $startPosForReadInBytes = $this->ftell();
-        $this->fseek($startPosForReadInBytes);
-        $csv2 = parent::current();
-
-        $truncatePos = $startPosForRewrite;
-
-        while (!$this->eof()) {
-            $this->fseek($startPosForReadInBytes);
-            parent::current();
-
-            $buffer = [];
-            while ($this->valid() && count($buffer) < 10000) {
-                $buffer[] = $this->current();
-                $truncatePos++;
-                $startPosForReadInBytes = $this->ftell();
-                $this->next();
-            }
-            $startForRewriteInBytes = $this->updateRows($buffer, $startForRewriteInBytes);
-            $this->fseek($startPosForReadInBytes);
-            parent::current();
-        }
         $this->fflush();
-
-        $this->seek($truncatePos - 1);
-        $this->current();
-        $truncatePosInByte = $this->ftell();
-
-        $this->ftruncate($truncatePosInByte);
+        $this->ftruncate($truncatePos);
+        $this->restorePrevCsvMode();
         $this->unlock();
     }
 
-    protected function updateRows(array $buffer, $startForRewriteInBytes)
+    protected function moveRows($charPosFrom, $charPosTo)
     {
-        $this->fseek($startForRewriteInBytes);
-        foreach ($buffer as $key => $line) {
+        $this->fseek($charPosFrom);
+        while (!$this->eof()) {
+            $this->fseek($charPosFrom);
+            parent::current();
 
-            $this->fputcsv($line);
-            $startForRewriteInBytes = $this->ftell();
+            $buffer = [];
+            while ($this->valid() && count($buffer) <= static::BUFFER_SIZE) {
+                $buffer[] = $this->current();
+                $charPosFrom = $this->ftell();
+                $this->next();
+            }
+
+            $this->fseek($charPosTo);
+            foreach ($buffer as $key => $line) {
+                $this->fwrite($line . PHP_EOL);  //$this->fputcsv($line); in csv mode
+                $charPosTo = $this->ftell();
+            }
+
+            $this->fseek($charPosFrom);
+            parent::current();
+            return $charPosTo;
         }
-
-        return $startForRewriteInBytes;
     }
 
 }
