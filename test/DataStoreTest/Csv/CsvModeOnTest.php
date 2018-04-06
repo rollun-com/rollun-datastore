@@ -40,8 +40,15 @@ class CsvModeOnTest extends CsvFileObjectAbstractTest
         $csvFileObject->lock(LOCK_SH);
         $csvFileObject->next();
         $row = $csvFileObject->current();
-        $csvFileObject->unlock();
         $this->assertEquals([2, 'two'], $row);
+        $csvFileObject->next();
+        $csvFileObject->next();
+        $row = $csvFileObject->current();
+        $this->assertEquals(4, $row[0]);
+        $csvFileObject->next();
+
+
+        $csvFileObject->unlock();
     }
 
     public function testRewind()
@@ -95,9 +102,9 @@ class CsvModeOnTest extends CsvFileObjectAbstractTest
     {
         //$count
         return array(
-            [0],
-            [1],
-            [1000],
+//            [0],
+//            [1],
+            [500000],
         );
     }
 
@@ -110,7 +117,7 @@ class CsvModeOnTest extends CsvFileObjectAbstractTest
         $rows = array(['id', 'val', 'str']);
         for ($index = 1; $index <= $count; $index++) {
             $val = $index * 10;
-            $rows[] = [$index, $val, str_repeat($index, rand(1, 1000))]; // rand(1, 100)//1 + $count - $index
+            $rows[] = [$index, $val, str_repeat($index, rand(1, 10))]; // rand(1, 100)//1 + $count - $index
         }
 
         $csvFileObject = $this->getCsvFileObject($rows);
@@ -121,7 +128,9 @@ class CsvModeOnTest extends CsvFileObjectAbstractTest
         foreach ($csvFileObject as $key => $row) {
             $savedRows[$key] = $row;
         }
+        var_dump('CSV mode ON testForeach ');
         var_dump(time() - $time);
+        var_dump(PHP_EOL);
         $expectedRows = $rows;
         unset($expectedRows[0]); //'id', 'val', 'str'
         $csvFileObject->unlock();

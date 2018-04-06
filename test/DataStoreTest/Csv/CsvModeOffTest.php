@@ -98,20 +98,45 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
         $csvFileObject->unlock();
     }
 
-    public function testForeach()
+    public function foreachProvider()
+    {
+        //$count
+        return array(
+//            [0],
+//            [1],
+            [500000],
+        );
+    }
+
+    /**
+     * @dataProvider foreachProvider
+     */
+    public function testForeach($count)
     {
 
-        $csvFileObject = $this->getCsvFileObject();
+        $rows = array(['id', 'val', 'str']);
+        for ($index = 1; $index <= $count; $index++) {
+            $val = $index * 10;
+            $rows[] = [$index, $val, str_repeat($index, 100)]; // rand(1, 100)//1 + $count - $index
+        }
+
+        $csvFileObject = $this->getCsvFileObject($rows);
 
         $csvFileObject->lock(LOCK_SH);
         $savedRows = [];
+        $time = time();
         foreach ($csvFileObject as $key => $row) {
-            $savedRows[$key] = $row;
+            $savedRows = $row;
+            substr_replace($row[2], '1', 1);
+            $row[2] = $row[0] > 100 ? 1 : 0;
         }
 
+        var_dump('CSV mode OFF testForeach ');
+        var_dump(time() - $time);
+        var_dump(PHP_EOL);
         $expectedRows = $this->defaultStrings;
         $csvFileObject->unlock();
-        $this->assertEquals($expectedRows, $savedRows);
+        //$this->assertEquals($expectedRows, $savedRows);
     }
 
 }

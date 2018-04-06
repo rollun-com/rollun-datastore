@@ -43,6 +43,11 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
         );
     }
 
+    public function tearDown()
+    {
+
+    }
+
     protected function getFullFilename($filename)
     {
         $dataDir = rtrim(Command::getDataDir(), DIRECTORY_SEPARATOR);
@@ -68,7 +73,7 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
             if (is_array($fields)) {
                 fputcsv($stream, $fields);
             } else {
-                fwrite($handle, $fields);
+                fwrite($stream, $fields);
             }
         }
         fflush($stream);
@@ -130,65 +135,65 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(['id', 'val'], $row);
     }
 
-    public function deleteRowProvider()
-    {
-        //$count, $indexForDelete
-        return array(
-            [10, 1],
-            [10, 2],
-            [10, 9],
-            [10, 10],
-                //[100000, 5000],
-        );
-    }
-
-    /**
-     *
-     * @param int $count
-     * @param int $indexForDelete
-     * @dataProvider deleteRowProvider
-     */
-    public function testDeleteRow($count, $indexForDelete)
-    {
-        $rows = array(['id', 'val', 'str']);
-        $expectedRows[] = 'shift';
-        for ($index = 1; $index <= $count; $index++) {
-            $val = $index * 10;
-            $rows[] = [$index, $val, str_repeat($index, rand(1, 1000))]; // rand(1, 100)//1 + $count - $index
-            if ($index != $indexForDelete) {
-                $expectedRows[] = $val;
-            }
-        }
-        unset($expectedRows[0]); //'shift'
-        $csvFileObject = $this->getCsvFileObject($rows);
-
-        $savedRows = [];
-        foreach ($csvFileObject as $key => $row) {
-            $savedRows[$key] = $row[1]; //[1];
-        }
-
-        $csvFileObject->deleteRow($indexForDelete);
-
-        $savedRows = [];
-        $csvFileObject->csvModeOn();
-        foreach ($csvFileObject as $key => $row) {
-            $savedRows[$key] = $row[1]; //[1];
-        }
-
-        $this->assertEquals($count - 1, count($savedRows));
-        $this->assertEquals($expectedRows[1], $savedRows[1]);
-        if ($indexForDelete - 1 > 0) {
-            $this->assertEquals($expectedRows[$indexForDelete - 1], $savedRows[$indexForDelete - 1]);
-        }
-        if ($indexForDelete <> $count) {
-            $this->assertEquals($expectedRows[$indexForDelete], $savedRows[$indexForDelete]);
-        }
-        if ($indexForDelete + 2 < $count) {
-            $this->assertEquals($expectedRows[$indexForDelete + 2], $savedRows[$indexForDelete + 2]);
-        }
-
-        $this->assertEquals($expectedRows[$count - 1], $savedRows[$count - 1]);
-        $this->assertEquals(['id', 'val', 'str'], $csvFileObject->getColumns());
-    }
-
+//
+//    public function deleteRowProvider()
+//    {
+//        //$count, $indexForDelete
+//        return array(
+//            [10, 1],
+//            [10, 2],
+//            [10, 9],
+//            [10, 10],
+//                //[100000, 5000],
+//        );
+//    }
+//
+//    /**
+//     *
+//     * @param int $count
+//     * @param int $indexForDelete
+//     * @dataProvider deleteRowProvider
+//     */
+//    public function testDeleteRow($count, $indexForDelete)
+//    {
+//        $rows = array(['id', 'val', 'str']);
+//        $expectedRows[] = 'shift';
+//        for ($index = 1; $index <= $count; $index++) {
+//            $val = $index * 10;
+//            $rows[] = [$index, $val, str_repeat($index, rand(1, 1000))]; // rand(1, 100)//1 + $count - $index
+//            if ($index != $indexForDelete) {
+//                $expectedRows[] = $val;
+//            }
+//        }
+//        unset($expectedRows[0]); //'shift'
+//        $csvFileObject = $this->getCsvFileObject($rows);
+//
+//        $savedRows = [];
+//        foreach ($csvFileObject as $key => $row) {
+//            $savedRows[$key] = $row[1]; //[1];
+//        }
+//
+//        $csvFileObject->deleteRow($indexForDelete);
+//
+//        $savedRows = [];
+//        $csvFileObject->csvModeOn();
+//        foreach ($csvFileObject as $key => $row) {
+//            $savedRows[$key] = $row[1]; //[1];
+//        }
+//
+//        $this->assertEquals($count - 1, count($savedRows));
+//        $this->assertEquals($expectedRows[1], $savedRows[1]);
+//        if ($indexForDelete - 1 > 0) {
+//            $this->assertEquals($expectedRows[$indexForDelete - 1], $savedRows[$indexForDelete - 1]);
+//        }
+//        if ($indexForDelete <> $count) {
+//            $this->assertEquals($expectedRows[$indexForDelete], $savedRows[$indexForDelete]);
+//        }
+//        if ($indexForDelete + 2 < $count) {
+//            $this->assertEquals($expectedRows[$indexForDelete + 2], $savedRows[$indexForDelete + 2]);
+//        }
+//
+//        $this->assertEquals($expectedRows[$count - 1], $savedRows[$count - 1]);
+//        $this->assertEquals(['id', 'val', 'str'], $csvFileObject->getColumns());
+//    }
 }

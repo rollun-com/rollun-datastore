@@ -39,13 +39,13 @@ class CsvFileObject extends \SplFileObject
     public function csvModeOn()
     {
         $this->prevCsvMode = $this->isCsvMode();
-        $this->setFlags(self::READ_CSV | \SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY);
+        $this->setFlags(\SplFileObject::READ_CSV | \SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY | \SplFileObject::READ_AHEAD); //| \SplFileObject::READ_AHEAD
     }
 
     public function csvModeOff()
     {
         $this->prevCsvMode = $this->isCsvMode();
-        $this->setFlags(0 | \SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY);
+        $this->setFlags(0 | \SplFileObject::DROP_NEW_LINE);
     }
 
     public function isCsvMode()
@@ -112,62 +112,61 @@ class CsvFileObject extends \SplFileObject
         return $columns;
     }
 
-    public function rewind()
-    {
-        parent::rewind();
-        parent::current();
-        if ($this->isCsvMode()) {
-            parent::next();
-            parent::current();
-        }
-    }
-
-    public function key()
-    {
-        if (parent::key() === 0 && $this->isCsvMode()) {
-            parent::current();
-            parent::next();
-        }
-        return parent::key();
-    }
-
-    public function next()
-    {
-        if (parent::key() === 0 && $this->isCsvMode()) {
-
-            parent::current();
-            parent::next();
-        }
-        parent::next();
-        //parent::current();
-    }
-
-    public function current()
-    {
-        if (parent::key() === 0 && $this->isCsvMode()) {
-            parent::current();
-            parent::next();
-        }
-
-        $row = parent::current();
-        if ([null] === $row) {
-            return null;
-        }
-        return is_array($row) ? $row : $row;
-    }
-
-    public function valid()
-    {
-        if (parent::key() === 0 && $this->isCsvMode()) {
-            parent::current();
-            parent::next();
-        }
-        if (!parent::valid()) {
-            return false;
-        }
-        $current = parent::current();
-        return $current <> [null] && $current <> null;
-    }
+//    public function rewind()
+//    {
+//        parent::rewind();
+//
+//        if ($this->isCsvMode()) {
+//            parent::current();
+//            parent::next();
+//            parent::current();
+//        }
+//    }
+//
+//    public function key()
+//    {
+//        if (parent::key() === 0 && $this->isCsvMode()) {
+//            parent::current();
+//            parent::next();
+//        }
+//        return parent::key();
+//    }
+//
+//    /**
+//     * @see https://stackoverflow.com/questions/1504927/splfileobject-next-behavior/1504981#1504981
+//     */
+//    public function next()
+//    {
+//        if (parent::key() === 0 && $this->isCsvMode()) {
+//            parent::current();
+//            parent::next();
+//        }
+//        parent::next();
+//        //parent::current();
+//    }
+//
+//    public function current()
+//    {
+//        if (parent::key() === 0 && $this->isCsvMode()) {
+//            parent::current();
+//            parent::next();
+//        }
+//
+//        $row = parent::current();
+//        if ([null] === $row) {
+//            return null;
+//        }
+//        return $row;
+//    }
+//
+//    public function valid()
+//    {
+//        if (parent::key() === 0 && $this->isCsvMode()) {
+//            parent::current();
+//            parent::next();
+//        }
+//        return parent::valid(); // && !empty(parent::current())
+//    }
 
     public function deleteRow($linePos)
     {
