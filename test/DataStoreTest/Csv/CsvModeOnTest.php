@@ -9,8 +9,6 @@ use rollun\test\datastore\Csv\CsvFileObjectAbstractTest;
 class CsvModeOnTest extends CsvFileObjectAbstractTest
 {
 
-    protected $csvMode = true;
-
     public function testGetColumns()
     {
         $rows = array(

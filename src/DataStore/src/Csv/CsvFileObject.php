@@ -14,11 +14,10 @@ class CsvFileObject extends \SplFileObject
     const BUFFER_SIZE = 3;  //i
 
     /**
-     * csv mode on - true, csv mode off - false
      *
-     * @var bool
+     * @var array
      */
-    protected $prevCsvMode = null;
+    protected $columns;
 
     /**
      *
@@ -28,45 +27,14 @@ class CsvFileObject extends \SplFileObject
     public function __construct($filename)
     {
         parent::__construct($filename, 'c+');
-        $this->csvModeOn();
+        $this->setFlags(\SplFileObject::READ_CSV | \SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY | \SplFileObject::READ_AHEAD);
+        $this->setCsvControl(',', '"', '"');
+        $this->getColumns();
     }
 
     public function __destruct()
     {
         $this->unlock();
-    }
-
-    public function csvModeOn()
-    {
-        $this->prevCsvMode = $this->isCsvMode();
-        $this->setFlags(\SplFileObject::READ_CSV | \SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY | \SplFileObject::READ_AHEAD); //| \SplFileObject::READ_AHEAD
-    }
-
-    public function csvModeOff()
-    {
-        $this->prevCsvMode = $this->isCsvMode();
-        $this->setFlags(0 | \SplFileObject::DROP_NEW_LINE);
-    }
-
-    public function isCsvMode()
-    {
-        $flags = $this->getFlags();
-        return (bool) ($flags & self::READ_CSV);
-    }
-
-    public function restorePrevCsvMode()
-    {
-        switch (true) {
-            case $this->prevCsvMode === true:
-                $this->csvModeOn();
-                break;
-            case $this->prevCsvMode === false:
-                $this->csvModeOff();
-                break;
-            default:
-                throw new \RuntimeException('Can not restore CSV mode');
-        }
-        $this->prevCsvMode = null;
     }
 
     /**
@@ -104,12 +72,14 @@ class CsvFileObject extends \SplFileObject
 
     public function getColumns()
     {
-        $this->lock(LOCK_SH);
-        parent::rewind();
-        $current = parent::current();
-        $columns = is_array($current) ? $current : trim($current);
-        $this->unlock();
-        return $columns;
+        if (emty($this->columns)) {
+            $this->lock(LOCK_SH);
+            parent::rewind();
+            $current = parent::current();
+            $this->columns = is_array($current) ? $current : trim($current);
+            $this->unlock();
+        }
+        return $this->columns;
     }
 
 //    public function rewind()

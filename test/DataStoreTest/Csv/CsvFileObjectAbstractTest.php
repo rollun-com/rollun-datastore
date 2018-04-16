@@ -15,14 +15,6 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
     protected $defaultArray;
     protected $defaultStrings;
 
-    /**
-     * 'true' : csvMode - ON
-     * 'false' : csvMode - OFF
-     *
-     * @var bool
-     */
-    protected $csvMode;
-
     public function setUp()
     {
         $this->fullFilename = $this->getFullFilename(static::CSV_TESTS_FILENAME);
@@ -87,11 +79,6 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
     {
         $rows = $rows ?? $this->defaultArray;
         $csvFileObject = new CsvFileObject($this->writeDataToCsv($rows));
-        if ($this->csvMode) {
-            $csvFileObject->csvModeOn();
-        } else {
-            $csvFileObject->csvModeOff();
-        }
         return $csvFileObject;
     }
 
@@ -106,29 +93,9 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(['id', 'val'], $row);
     }
 
-    public function testCsvMode()
-    {
-        $csvFileObject = new CsvFileObject($this->writeDataToCsv([]));
-        $this->assertTrue($csvFileObject->isCsvMode());
-
-        $csvFileObject->csvModeOff();
-        $this->assertFalse($csvFileObject->isCsvMode());
-        $csvFileObject->csvModeOn();
-        $this->assertTrue($csvFileObject->isCsvMode());
-
-        $csvFileObject->restorePrevCsvMode();
-        $this->assertFalse($csvFileObject->isCsvMode());
-        $this->expectException(\RuntimeException::class);
-        $csvFileObject->restorePrevCsvMode();
-
-        $csvFileObject->csvModeOff();
-        $this->assertFalse($csvFileObject->isCsvMode());
-    }
-
     public function testCsvFileObjectFgetcsv()
     {
         $csvFileObject = $this->getCsvFileObject();
-
         $csvFileObject->lock(LOCK_SH);
         $row = $csvFileObject->fgetcsv();
         $csvFileObject->unlock();
