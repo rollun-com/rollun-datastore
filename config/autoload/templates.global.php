@@ -1,8 +1,6 @@
 <?php
 
 use Zend\Expressive\Template\TemplateRendererInterface;
-use Zend\Expressive\Twig\TwigEnvironmentFactory;
-use Zend\Expressive\Twig\TwigRendererFactory;
 use Zend\Expressive\ZendView\HelperPluginManagerFactory;
 use Zend\Expressive\ZendView\ZendViewRendererFactory;
 use Zend\View\HelperPluginManager;
@@ -16,7 +14,6 @@ return [
     ],
 
     'templates' => [
-        'layout' => 'layout::default',
     ],
 
     'view_helpers' => [

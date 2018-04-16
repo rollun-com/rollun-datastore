@@ -33,7 +33,7 @@ class ConfigProvider
     {
         return [
             'paths' => [
-                'app'    => [__DIR__ . '/../templates/app'],
+                'ds-app'    => [__DIR__ . '/../templates/ds-app'],
             ],
         ];
     }

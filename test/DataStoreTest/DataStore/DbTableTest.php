@@ -9,6 +9,11 @@
 
 namespace rollun\test\datastore\DataStore;
 
+use PDOException;
+use rollun\datastore\DataStore\DataStoreException;
+use Xiag\Rql\Parser\Node\Query\ScalarOperator\EqNode;
+use Xiag\Rql\Parser\Node\SelectNode;
+use Xiag\Rql\Parser\Node\SortNode;
 use Xiag\Rql\Parser\Query;
 use rollun\datastore\DataStore\DbTable;
 use rollun\datastore\Rql\RqlQuery;
@@ -20,6 +25,9 @@ use Zend\Db\TableGateway\TableGateway;
  */
 class DbTableTest extends AbstractTest
 {
+
+    const TABLE_EXPLOIT_1_NAME = "test_exploit1_tablle";
+    const TABLE_EXPLOIT_2_NAME = "test_exploit2_tablle";
 
     /**
      * @var DbTable
@@ -41,13 +49,16 @@ class DbTableTest extends AbstractTest
     /**
      * Sets up the fixture, for example, opens a network connection.
      * This method is called before a test is executed.
+     * @param string $dataStoreName
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
-    protected function setUp()
+    protected function setUp($dataStoreName = "testDbTable")
     {
         parent::setUp();
-        $this->dbTableName = $this->config['testDbTable']['tableName'];
+        $this->dbTableName = $this->config[$dataStoreName]['tableName'];
         $this->adapter = $this->container->get('db');
-        $this->object = $this->container->get('testDbTable');
+        $this->object = $this->container->get($dataStoreName);
     }
 
     /**
@@ -127,6 +138,40 @@ class DbTableTest extends AbstractTest
         $dbTable = new TableGateway($this->dbTableName, $this->adapter);
         foreach ($data as $record) {
             $dbTable->insert($record);
+        }
+    }
+
+    /**
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     */
+    public function test_exploit()
+    {
+        $expected = [
+            ['id' => 1, 'fString' => 'val1',],
+            ['id' => 2, 'fString' => 'val2',],
+            ['id' => 3, 'fString' => 'val3',],
+            ['id' => 4, 'fString' => 'val4',],
+        ];
+        $this->setUp("exploited1DbTable");
+        $this->_initObject([
+            ['id' => 5, 'fString' => 'val5',],
+            ['id' => 6, 'fString' => 'val6',],
+            ['id' => 7, 'fString' => 'val7',],
+            ['id' => 8, 'fString' => 'val8',],
+        ]);
+        $this->setUp("exploited2DbTable");
+        $this->_initObject($expected);
+
+        $query = new Query();
+        $query->setSelect(new SelectNode(["id", "fString"]));
+        //$query->setQuery(new EqNode("id` IN (SELECT id FROM test_res_http) OR `id", "val"));
+        $query->setQuery(new EqNode("id` = 1) UNION SELECT id, fString FROM ".static::TABLE_EXPLOIT_1_NAME.";#`id", "val"));
+        try {
+            $result = $this->object->query($query);
+            $this->assertEquals($expected, $result);//Assert false.
+        }catch (PDOException $exception) {
+            $this->assertTrue(true);
         }
     }
 

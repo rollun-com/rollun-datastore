@@ -49,7 +49,7 @@ class TableManagerMysqlFactoryTest extends \PHPUnit_Framework_TestCase
     {
         $this->object = $this->container->get('TableManagerMysql');
         $this->assertSame(
-                get_class($this->object), TableManagerMysql::class
+            get_class($this->object), TableManagerMysql::class
         );
     }
 

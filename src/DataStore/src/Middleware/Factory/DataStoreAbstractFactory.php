@@ -48,6 +48,8 @@ class DataStoreAbstractFactory extends AbstractFactoryAbstract
      * @param  ContainerInterface $container
      * @param  string $requestedName
      * @return bool
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     public function canCreate(ContainerInterface $container, $requestedName)
     {
@@ -63,7 +65,8 @@ class DataStoreAbstractFactory extends AbstractFactoryAbstract
      * @param  string $requestedName
      * @param  array $options
      * @return MiddlewareInterface
-     * @throws DataStoreException
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     public function __invoke(ContainerInterface $container, $requestedName, array $options = null)
     {

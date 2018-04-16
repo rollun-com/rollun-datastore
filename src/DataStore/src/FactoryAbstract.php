@@ -9,8 +9,7 @@
 
 namespace rollun\datastore;
 
-use Zend\ServiceManager\FactoryInterface;
-use Zend\ServiceManager\ServiceLocatorInterface;
+use Zend\ServiceManager\Factory\FactoryInterface;
 use Interop\Container\ContainerInterface;
 
 abstract class FactoryAbstract implements FactoryInterface
@@ -19,19 +18,10 @@ abstract class FactoryAbstract implements FactoryInterface
     /**
      * Alias for "createService"
      *
-     * @param ServiceLocatorInterface $serviceLocator
+     * @param ContainerInterface $container
+     * @param $requestedName
+     * @param array|null $options
      * @return mixed
      */
     abstract public function __invoke(ContainerInterface $container, $requestedName, array $options = null);
-
-    /**
-     * {@inherit}
-     *
-     * {@inherit}
-     */
-    public function createService(ServiceLocatorInterface $serviceLocator)
-    {
-        return $this->__invoke($serviceLocator, null);
-    }
-
 }

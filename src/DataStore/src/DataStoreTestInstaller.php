@@ -11,6 +11,7 @@ namespace rollun\datastore;
 use Composer\IO\IOInterface;
 use Interop\Container\ContainerInterface;
 use rollun\datastore\DataStore\Aspect\AspectInstaller;
+use rollun\datastore\DataStore\DbTable;
 use rollun\datastore\DataStore\Installers\CacheableInstaller;
 use rollun\datastore\DataStore\Installers\CsvInstaller;
 use rollun\datastore\DataStore\Installers\DbTableInstaller;
@@ -49,53 +50,61 @@ class DataStoreTestInstaller extends InstallerAbstract
             ]
         ];
         $this->dataStore = [
+            'exploited1DbTable' => [
+                'class' => DbTable::class,
+                'tableName' => "test_exploit1_tablle"
+            ],
+            'exploited2DbTable' => [
+                'class' => DbTable::class,
+                'tableName' => "test_exploit2_tablle"
+            ],
             'test_DataStoreDbTableWithNameAsResourceName' => [
-                'class' => \rollun\datastore\DataStore\DbTable::class,
+                'class' => DbTable::class,
                 'tableName' => 'table_for_db_data_store'
             ],
             'test_StoreForMiddleware' => [
-                'class' => \rollun\datastore\DataStore\Memory::class,
+                'class' => DataStore\Memory::class,
             ],
             'testDbTable' => [
-                'class' => \rollun\datastore\DataStore\DbTable::class,
+                'class' => DbTable::class,
                 'tableName' => 'test_res_tablle'
             ],
 
             'testDbTableMultiInsert' => [
-                'class' => \rollun\datastore\DataStore\DbTable::class,
+                'class' => DbTable::class,
                 'tableGateway' => 'test_res_tablle',
             ],
             'testHttpClient' => [
-                'class' => \rollun\datastore\DataStore\HttpClient::class,
+                'class' => DataStore\HttpClient::class,
                 'tableName' => 'test_res_http',
                 'url' => 'http://' . constant("HOST") . '/api/datastore/test_res_http',
                 'options' => ['timeout' => 30]
             ],
             'testMemory' => [
-                'class' => \rollun\datastore\DataStore\Memory::class,
+                'class' => DataStore\Memory::class,
             ],
             'testCsvBase' => [
-                'class' => \rollun\datastore\DataStore\CsvBase::class,
+                'class' => DataStore\CsvBase::class,
                 'filename' => sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'testCsvBase.tmp',
                 'delimiter' => ';',
             ],
             'testCsvIntId' => [
-                'class' => \rollun\datastore\DataStore\CsvIntId::class,
+                'class' => DataStore\CsvIntId::class,
                 'filename' => sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'testCsvIntId.tmp',
                 'delimiter' => ';',
             ],
             'testAspectAbstract' => [
-                'class' => \rollun\datastore\DataStore\Aspect\AspectAbstract::class,
+                'class' => DataStore\Aspect\AspectAbstract::class,
                 'dataStore' => 'testMemory',
             ],
 
             'testDataSourceDb' => [
-                'class' => \rollun\datastore\DataSource\DbTableDataSource::class,
+                'class' => DataSource\DbTableDataSource::class,
                 'tableName' => 'test_res_http'
             ],
 
             'testCacheable' => [
-                'class' => \rollun\datastore\DataStore\Cacheable::class,
+                'class' => DataStore\Cacheable::class,
                 'dataSource' => 'testDataSourceDb',
                 'cacheable' => 'testDbTable'
             ]

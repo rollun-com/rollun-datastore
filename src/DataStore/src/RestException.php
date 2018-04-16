@@ -9,9 +9,7 @@
 
 namespace rollun\datastore;
 
-use rollun\logger\Exception\LoggedException;
-
-class RestException extends LoggedException
+class RestException extends \RuntimeException
 {
 
 }

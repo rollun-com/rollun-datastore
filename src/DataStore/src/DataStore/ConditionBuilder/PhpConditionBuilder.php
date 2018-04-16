@@ -54,7 +54,7 @@ class PhpConditionBuilder extends ConditionBuilderAbstract
      */
     public function prepareFieldName($fieldName)
     {
-        return '$item[\'' . $fieldName . '\']';
+        return '$item[\'' . addslashes($fieldName) . '\']';
     }
 
     /**
@@ -74,7 +74,7 @@ class PhpConditionBuilder extends ConditionBuilderAbstract
             case is_null($fieldValue):
                 return 'null';
             case is_string($fieldValue):
-                return "'" . $fieldValue . "'";
+                return "'" . addslashes($fieldValue) . "'";
             default:
                 throw new DataStoreException(
                     'Type ' . gettype($fieldValue) . ' is not supported'

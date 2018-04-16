@@ -12,7 +12,7 @@ use Interop\Container\ContainerInterface;
 use Interop\Container\Exception\ContainerException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use rollun\datastore\Middleware\HtmlDataStoreRendererAction;
+use rollun\datastore\Middleware\HtmlDataPrepare;
 use Zend\Expressive\Template\TemplateRendererInterface;
 use Zend\ServiceManager\Exception\ServiceNotCreatedException;
 use Zend\ServiceManager\Exception\ServiceNotFoundException;
@@ -31,11 +31,13 @@ class HtmlDataStoreRendererFactory implements FactoryInterface
      * @param  null|array $options
      * @return object
      * @throws \Exception
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     public function __invoke(ContainerInterface $container, $requestedName, array $options = null)
     {
         if ($container->has(TemplateRendererInterface::class)) {
-            return new HtmlDataStoreRendererAction($container->get(TemplateRendererInterface::class));
+            return new HtmlDataPrepare($container->get(TemplateRendererInterface::class));
         }
         throw new \Exception(TemplateRendererInterface::class . " not fount in container");
     }

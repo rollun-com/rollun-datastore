@@ -57,6 +57,8 @@ class TableGatewayAbstractFactory extends AbstractFactoryAbstract
      * @param  ContainerInterface $container
      * @param  string $requestedName
      * @return bool
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     public function canCreate(ContainerInterface $container, $requestedName)
     {
@@ -79,6 +81,8 @@ class TableGatewayAbstractFactory extends AbstractFactoryAbstract
      * @param ContainerInterface $container
      * @param $requestedName
      * @return bool
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     protected function setDbAdapter(ContainerInterface $container, $requestedName)
     {
@@ -103,6 +107,8 @@ class TableGatewayAbstractFactory extends AbstractFactoryAbstract
      * @param  string $requestedName
      * @param  array $options
      * @return \rollun\datastore\DataStore\Interfaces\DataStoresInterface|TableGateway
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     public function __invoke(ContainerInterface $container, $requestedName, array $options = null)
     {
@@ -122,6 +128,8 @@ class TableGatewayAbstractFactory extends AbstractFactoryAbstract
      *
      * @param ContainerInterface $container
      * @return array|false
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     protected function getCachedTables(ContainerInterface $container)
     {

@@ -282,4 +282,17 @@ class CacheableTest extends AbstractTest
             0, $this->object->count()
         );
     }
+
+    public function zeroFirstDataProvider() {
+        return [["010"]];//not need
+    }
+    /**
+     * @param $fString
+     * @dataProvider zeroFirstDataProvider
+     */
+    public function test_WithZeroString($fString)
+    {
+        $this->assertTrue(true);//cant create new item
+    }
+
 }

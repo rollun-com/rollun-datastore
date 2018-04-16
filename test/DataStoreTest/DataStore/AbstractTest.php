@@ -1196,6 +1196,40 @@ abstract class AbstractTest extends \PHPUnit_Framework_TestCase
                 ], $result);
     }
 
+
+    public function zeroFirstDataProvider() {
+        return [
+          ["010"],
+          ['010'],
+          ["01"],
+          ['010'],
+          ["010"],
+          ['074531'],
+          ["074531"],
+          ["07"],
+          ['07'],
+        ];
+    }
+    /**
+     * @throws \rollun\datastore\DataStore\DataStoreException
+     * @dataProvider zeroFirstDataProvider
+     */
+    public function test_WithZeroString($fString) {
+        $this->_initObject($this->_itemsArrayDelault);
+        //        array(),
+
+        $expected = [
+            'id' => 5,
+            'anotherId' => 100,
+            'fString' => $fString,
+            'fFloat' => 400.0004
+        ];
+        $this->object->create($expected);
+        $object = $this->object->read($expected["id"]);
+        //$this->assertSame($expected, $object); same only zeroFirstVal
+        $this->assertSame($expected["fString"], $object["fString"]);
+    }
+
     /**
      * Sets up the fixture, for example, opens a network connection.
      * This method is called before a test is executed.

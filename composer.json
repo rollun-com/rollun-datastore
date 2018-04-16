@@ -14,42 +14,41 @@
         }
     ],
     "require": {
-        "php": "^5.6 || ^7.0",
-        "zendframework/zend-component-installer": "^1.0 || ^0.7.0",
-        "zendframework/zend-config-aggregator": "^0.2.0",
+        "php": "^7.0",
         "zendframework/zend-expressive": "^2.0.2",
-        "zendframework/zend-expressive-helpers": "^4.0",
         "zendframework/zend-stdlib": "^3.1",
         "zendframework/zend-servicemanager": "^3.3",
-        "zendframework/zend-expressive-fastroute": "^2.0",
-        "zendframework/zend-expressive-zendviewrenderer": "^1.4",
         "zendframework/zend-db": "2.8.2",
-        "psr/log": "^1.0",
+        "zendframework/zend-json": "^3.0",
         "xiag/rql-parser": "^1.0",
         "symfony/filesystem": "^3.3",
         "zendframework/zend-http": "^2.5",
-        "rollun-com/rollun-logger": "^3.2",
-        "rollun-com/rollun-utils": "^3.2",
-        "rollun-com/rollun-installer": "^3.2",
-        "rollun-com/rollun-actionrender": "^5.1",
-        "zendframework/zend-json": "^3.0",
+        "rollun-com/rollun-utils": "^4.0",
+        "rollun-com/rollun-installer": "^4.0",
+        "rollun-com/rollun-actionrender": "^6.0",
         "http-interop/http-middleware": "0.4.1"
     },
     "require-dev": {
+        "zendframework/zend-component-installer": "^1.1",
+        "zendframework/zend-config-aggregator": "^1.0",
+        "zendframework/zend-expressive-helpers": "^4.0",
+        "zendframework/zend-expressive-fastroute": "^2.0",
+        "zendframework/zend-expressive-zendviewrenderer": "^1.4",
         "phpunit/phpunit": "^5.7.15",
         "squizlabs/php_codesniffer": "^2.8.1",
         "zfcampus/zf-development-mode": "^3.1",
-        "zendframework/zend-expressive-tooling": "^0.3.2",
         "filp/whoops": "^2.1.7"
     },
     "autoload": {
         "psr-4": {
-            "rollun\\datastore\\": "src/DataStore/src"
+            "rollun\\datastore\\": "src/DataStore/src",
+            "rollun\\uploader\\": "src/Uploader/src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "rollun\\test\\datastore\\": "test/DataStoreTest"
+            "rollun\\test\\datastore\\": "test/DataStoreTest",
+            "rollun\\test\\uploader\\": "test/UploaderTest"
         }
     },
     "scripts": {
@@ -69,7 +68,6 @@
         "serve": "php -S 0.0.0.0:8080 -t public public/index.php",
         "test": "phpunit --colors=always",
         "test-coverage": "phpunit --colors=always --coverage-clover clover.xml",
-        "upload-coverage": "coveralls -v",
-        "lib": "rollun\\installer\\Command::command"
+        "upload-coverage": "coveralls -v"
     }
 }

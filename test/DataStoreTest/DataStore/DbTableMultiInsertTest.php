@@ -15,17 +15,19 @@ class DbTableMultiInsertTest extends DbTableTest
     /** @var  TableGateway */
     protected $dbTable;
 
-    protected function setUp()
+    protected function setUp($dataStoreName = "testDbTableMultiInsert")
     {
-        parent::setUp();
-        $tableGateway = $this->config['testDbTableMultiInsert']['tableGateway'];
+        $this->container = include './config/container.php';
+        $this->config = $this->container->get('config')['dataStore'];
+
+        $tableGateway = $this->config[$dataStoreName]['tableGateway'];
 
         $this->dbTable = $this->container->get($tableGateway);
 
         $this->dbTableName = $this->dbTable->getTable();
 
         $this->adapter = $this->container->get('db');
-        $this->object = $this->container->get('testDbTableMultiInsert');
+        $this->object = $this->container->get($dataStoreName);
     }
 
     public function testCreate_multiRow_withoutId()
@@ -88,5 +90,10 @@ class DbTableMultiInsertTest extends DbTableTest
         $this->_prepareTable($data);
 
         $this->dbTable->insert($data);
+    }
+
+    public function test_exploit()
+    {
+        $this->assertTrue(true);
     }
 }

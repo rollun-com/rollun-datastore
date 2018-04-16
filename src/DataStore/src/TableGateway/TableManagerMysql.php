@@ -140,6 +140,7 @@ class TableManagerMysql
      *
      * @param Adapter\Adapter $db
      * @param null $config
+     * @throws \ReflectionException
      */
     public function __construct(Adapter\Adapter $db, $config = null)
     {
@@ -167,6 +168,7 @@ class TableManagerMysql
      * @return mixed
      * @throws DataStoreException
      * @throws RestException
+     * @throws \ReflectionException
      */
     public function createTable($tableName, $tableConfig = null)
     {
@@ -186,6 +188,7 @@ class TableManagerMysql
      * @param string $tableName
      * @param string $tableConfig
      * @return mixed
+     * @throws \ReflectionException
      */
     public function rewriteTable($tableName, $tableConfig = null)
     {
@@ -324,6 +327,7 @@ class TableManagerMysql
      * @param $tableConfig
      * @return Adapter\Driver\StatementInterface|\Zend\Db\ResultSet\ResultSet
      * @throws RestException
+     * @throws \ReflectionException
      */
     protected function create($tableName, $tableConfig = null)
     {
@@ -369,7 +373,6 @@ class TableManagerMysql
                     , $fieldData[self::FOREIGN_KEY]['referenceColumn']
                     , $onDeleteRule
                     , $onUpdateRule
-                    , $foreignKeyConstraintName
                 );
                 $alterTable->addConstraint($foreignKeyInstance);
             }

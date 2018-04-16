@@ -42,6 +42,9 @@ class TableManagerMysqlFactory extends FactoryAbstract
      * @param  string $requestedName
      * @param  array $options
      * @return mixed|TableManagerMysql
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \ReflectionException
      */
     public function __invoke(ContainerInterface $container, $requestedName, array $options = null)
     {

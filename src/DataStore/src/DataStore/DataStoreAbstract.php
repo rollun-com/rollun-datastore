@@ -151,6 +151,7 @@ abstract class DataStoreAbstract implements DataStoresInterface
                 '$result = ' . PHP_EOL
                 . rtrim($conditioon, PHP_EOL) . ';' . PHP_EOL
                 . 'return $result;';
+//print_r($whereFunctionBody);
         $whereFunction = create_function('$item', $whereFunctionBody);
         $suitableItemsNumber = 0;
         $result = [];
@@ -184,9 +185,10 @@ abstract class DataStoreAbstract implements DataStoresInterface
             }
             $cond = $ordVal == SortNode::SORT_DESC ? '<' : '>';
             $notCond = $ordVal == SortNode::SORT_ASC ? '<' : '>';
-
-            $prevCompareLevel = "if (\$a['$ordKey'] $cond \$b['$ordKey']) {return 1;};" . PHP_EOL
-                    . "if (\$a['$ordKey'] $notCond  \$b['$ordKey']) {return -1;};" . PHP_EOL;
+            $ordKeySafe = "'". addslashes($ordKey) ."'";
+            $prevCompareLevel = "if (!isset(\$a[$ordKeySafe])) {return 0;};" . PHP_EOL
+                    . "if (\$a[$ordKeySafe] $cond \$b[$ordKeySafe]) {return 1;};" . PHP_EOL
+                    . "if (\$a[$ordKeySafe] $notCond  \$b[$ordKeySafe]) {return -1;};" . PHP_EOL;
             $nextCompareLevel = $nextCompareLevel . $prevCompareLevel;
         }
         $sortFunctionBody = $nextCompareLevel . 'return 0;';

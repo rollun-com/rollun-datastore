@@ -9,18 +9,26 @@
 namespace rollun\datastore\Middleware;
 
 use rollun\actionrender\Factory\ActionRenderAbstractFactory;
-use rollun\actionrender\Factory\LazyLoadPipeAbstractFactory;
+use rollun\actionrender\Factory\LazyLoadMiddlewareAbstractFactory;
 use rollun\actionrender\Factory\MiddlewarePipeAbstractFactory;
 use rollun\actionrender\Installers\ActionRenderInstaller;
-use rollun\actionrender\Installers\BasicRenderInstaller;
-use rollun\actionrender\LazyLoadMiddlewareGetter\Factory\AbstractLazyLoadMiddlewareGetterAbstractFactory;
-use rollun\actionrender\LazyLoadMiddlewareGetter\Factory\ResponseRendererAbstractFactory;
-use rollun\actionrender\LazyLoadMiddlewareGetter\ResponseRenderer;
-use rollun\actionrender\Renderer\Json\JsonRendererAction;
-use rollun\datastore\DataStore\Factory\MemoryAbstractFactory;
-use rollun\datastore\LazyLoadDSMiddlewareGetter;
-use rollun\datastore\Middleware\Factory\HtmlDataStoreRendererFactory;
+use rollun\actionrender\Installers\BasicRenderInstaller;;
+
+use rollun\actionrender\MiddlewareDeterminator\AttributeParam;
+use rollun\actionrender\MiddlewareDeterminator\Factory\AbstractMiddlewareDeterminatorAbstractFactory;
+use rollun\actionrender\MiddlewareDeterminator\Factory\AttributeParamAbstractFactory;
+use rollun\actionrender\MiddlewareDeterminator\Factory\HeaderSwitchAbstractFactory;
+use rollun\actionrender\MiddlewareDeterminator\HeaderSwitch;
+use rollun\actionrender\MiddlewareDeterminator\Installers\AttributeParamInstaller;
+use rollun\actionrender\MiddlewareDeterminator\Installers\HeaderSwitchInstaller;
+use rollun\actionrender\MiddlewarePluginManager;
+use rollun\actionrender\Renderer\Json\JsonRenderer;
+use rollun\datastore\DataStoreMiddlewareDeterminator;
+use \rollun\datastore\Middleware;
+use \rollun\actionrender\Renderer;
+use rollun\datastore\Middleware\Factory\ImplicitDataStoreMiddlewareAbstractFactory;
 use rollun\installer\Install\InstallerAbstract;
+use Zend\ServiceManager\Factory\InvokableFactory;
 
 class DataStoreMiddlewareInstaller extends InstallerAbstract
 {
@@ -33,30 +41,40 @@ class DataStoreMiddlewareInstaller extends InstallerAbstract
     {
         return [
             'dependencies' => [
-                'invokables' => [
-                    ResourceResolver::class => ResourceResolver::class,
-                    RequestDecoder::class => RequestDecoder::class,
-                    LazyLoadDSMiddlewareGetter::class => LazyLoadDSMiddlewareGetter::class,
-                ],
                 'factories' => [
-                    HtmlDataStoreRendererAction::class => HtmlDataStoreRendererFactory::class
+                    ResourceResolver::class => InvokableFactory::class,
+                    RequestDecoder::class => InvokableFactory::class,
+                    HtmlDataPrepare::class => InvokableFactory::class,
                 ],
+                "abstract_factories" => [
+                    ImplicitDataStoreMiddlewareAbstractFactory::class
+                ]
             ],
-            AbstractLazyLoadMiddlewareGetterAbstractFactory::KEY => [
+            AbstractMiddlewareDeterminatorAbstractFactory::KEY => [
                 'dataStoreHtmlJsonRenderer' => [
-                    ResponseRendererAbstractFactory::KEY_MIDDLEWARE => [
-                        '/application\/json/' => JsonRendererAction::class,
+                    HeaderSwitchAbstractFactory::KEY_CLASS => HeaderSwitch::class,
+                    HeaderSwitchAbstractFactory::KEY_NAME => "Accept",
+                    HeaderSwitchAbstractFactory::KEY_MIDDLEWARE_MATCHING => [
+                        '/application\/json/' => JsonRenderer::class,
                         '/text\/html/' => 'dataStoreHtmlRenderer'
                     ],
-                    ResponseRendererAbstractFactory::KEY_CLASS => ResponseRenderer::class,
                 ],
+                DataStoreMiddlewareDeterminator::class => [
+                    AttributeParamAbstractFactory::KEY_CLASS => DataStoreMiddlewareDeterminator::class,
+                    AttributeParamAbstractFactory::KEY_NAME => "resourceName",
+                ]
             ],
+            LazyLoadMiddlewareAbstractFactory::KEY => [
+                'dataStoreLLPipe' => [
+                    LazyLoadMiddlewareAbstractFactory::KEY_MIDDLEWARE_DETERMINATOR => DataStoreMiddlewareDeterminator::class,
+                    LazyLoadMiddlewareAbstractFactory::KEY_MIDDLEWARE_PLUGIN_MANAGER => MiddlewarePluginManager::class
+                ],
+                'dataStoreHtmlJsonRendererLLPipe' => [
+                    LazyLoadMiddlewareAbstractFactory::KEY_MIDDLEWARE_DETERMINATOR => "dataStoreHtmlJsonRenderer",
+                    LazyLoadMiddlewareAbstractFactory::KEY_MIDDLEWARE_PLUGIN_MANAGER => MiddlewarePluginManager::class,
 
-            LazyLoadPipeAbstractFactory::KEY => [
-                'dataStoreLLPipe' => LazyLoadDSMiddlewareGetter::class,
-                'dataStoreHtmlJsonRendererLLPipe' => 'dataStoreHtmlJsonRenderer'
+                ]
             ],
-
             ActionRenderAbstractFactory::KEY => [
                 'api-datastore' => [
                     ActionRenderAbstractFactory::KEY_ACTION_MIDDLEWARE_SERVICE => 'apiDataStoreAction',
@@ -67,15 +85,16 @@ class DataStoreMiddlewareInstaller extends InstallerAbstract
             MiddlewarePipeAbstractFactory::KEY => [
                 'apiDataStoreAction' => [
                     MiddlewarePipeAbstractFactory::KEY_MIDDLEWARES => [
-                        \rollun\datastore\Middleware\ResourceResolver::class,
-                        \rollun\datastore\Middleware\RequestDecoder::class,
+                        Middleware\ResourceResolver::class,
+                        Middleware\RequestDecoder::class,
                         'dataStoreLLPipe'
                     ]
                 ],
                 'dataStoreHtmlRenderer' => [
                     MiddlewarePipeAbstractFactory::KEY_MIDDLEWARES => [
-                        \rollun\actionrender\Renderer\Html\HtmlParamResolver::class,
-                        \rollun\datastore\Middleware\HtmlDataStoreRendererAction::class
+                        Renderer\Html\HtmlParamResolver::class,
+                        Middleware\HtmlDataPrepare::class,
+                        Renderer\Html\HtmlRenderer::class,
                     ]
                 ]
             ],
@@ -120,19 +139,16 @@ class DataStoreMiddlewareInstaller extends InstallerAbstract
     {
         $config = $this->container->get('config');
         return (
-            isset($config['dependencies']['invokables']) &&
             isset($config['dependencies']['factories']) &&
-            in_array(ResourceResolver::class,$config['dependencies']['invokables']) &&
-            in_array( RequestDecoder::class,$config['dependencies']['invokables']) &&
-            in_array(LazyLoadDSMiddlewareGetter::class,$config['dependencies']['invokables']) &&
-            $config['dependencies']['factories'][HtmlDataStoreRendererAction::class] === HtmlDataStoreRendererFactory::class &&
-            isset($config[AbstractLazyLoadMiddlewareGetterAbstractFactory::KEY]['dataStoreHtmlJsonRenderer']) &&
-            isset($config[LazyLoadPipeAbstractFactory::KEY]['dataStoreLLPipe']) &&
-            isset($config[LazyLoadPipeAbstractFactory::KEY]['dataStoreHtmlJsonRendererLLPipe']) &&
-            isset($config[ActionRenderAbstractFactory::KEY]['api-datastore']) &&
-            isset($config[MiddlewarePipeAbstractFactory::KEY]['apiDataStoreAction']) &&
-            isset($config[MiddlewarePipeAbstractFactory::KEY]['dataStoreHtmlRenderer']) &&
-            isset($config[MiddlewarePipeAbstractFactory::KEY]['dataStoreHtmlRenderer'])
+            in_array(ImplicitDataStoreMiddlewareAbstractFactory::class,$config['dependencies']['abstract_factories']) &&
+            in_array(ResourceResolver::class,$config['dependencies']['factories']) &&
+            in_array( RequestDecoder::class,$config['dependencies']['factories']) &&
+            in_array( HtmlDataPrepare::class,$config['dependencies']['factories']) &&
+            in_array( DataStoreMiddlewareDeterminator::class,$config['dependencies']['factories']) &&
+            isset($config[AbstractMiddlewareDeterminatorAbstractFactory::KEY]['dataStoreHtmlJsonRenderer']) &&
+            isset($config[LazyLoadMiddlewareAbstractFactory::KEY]['dataStoreLLPipe']) &&
+            isset($config[LazyLoadMiddlewareAbstractFactory::KEY]['dataStoreHtmlJsonRendererLLPipe']) &&
+            isset($config[ActionRenderAbstractFactory::KEY]['api-datastore'])
         );
     }
 
@@ -140,7 +156,9 @@ class DataStoreMiddlewareInstaller extends InstallerAbstract
     {
         return [
             BasicRenderInstaller::class,
-            ActionRenderInstaller::class
+            ActionRenderInstaller::class,
+            AttributeParamInstaller::class,
+            HeaderSwitchInstaller::class,
         ];
     }
 

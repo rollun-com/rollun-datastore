@@ -63,8 +63,9 @@ class RequestDecoder implements MiddlewareInterface
         $request = $request->withAttribute('putBefore', $putBefore);
 
         $rqlQueryStringWithXdebug = $request->getUri()->getQuery();
-
-        $rqlQueryString = rtrim($rqlQueryStringWithXdebug, '&XDEBUG_SESSION_START=netbeans-xdebug');
+        //$rqlQueryString = rtrim($rqlQueryStringWithXdebug, '&XDEBUG_SESSION_START=netbeans-xdebug');
+        //trim XDEBUG query params
+        $rqlQueryString = preg_replace('/\&XDEBUG_SESSION_START\=[\w\d_-]+/', "", $rqlQueryStringWithXdebug);
         $rqlQueryObject = RqlParser::rqlDecode($rqlQueryString);
         $request = $request->withAttribute('rqlQueryObject', $rqlQueryObject);
 

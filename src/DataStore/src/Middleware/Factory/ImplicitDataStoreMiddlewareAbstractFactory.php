@@ -9,21 +9,16 @@
 namespace rollun\datastore\Middleware\Factory;
 
 use Interop\Container\ContainerInterface;
-use Interop\Container\Exception\ContainerException;
-use rollun\datastore\DataStore\DataStoreException;
+use Interop\Http\ServerMiddleware\MiddlewareInterface;
 use rollun\datastore\DataStore\DbTable;
 use Zend\ServiceManager\Exception\ServiceNotCreatedException;
-use Zend\ServiceManager\Exception\ServiceNotFoundException;
 use Zend\ServiceManager\Factory\AbstractFactoryInterface;
-use Zend\ServiceManager\Factory\FactoryInterface;
-use Zend\ServiceManager\ServiceLocatorInterface;
-use rollun\datastore\RestException;
 use rollun\datastore\Middleware;
 use rollun\datastore\DataStore\Interfaces\DataStoresInterface;
-use Zend\Stratigility\MiddlewareInterface;
 
-class DataStoreMiddlewareFactory implements FactoryInterface
+class ImplicitDataStoreMiddlewareAbstractFactory implements AbstractFactoryInterface
 {
+    const KEY_MIDDLEWARE_POSTFIX = "DataStoreMiddleware";
 
     /**
      * Create an object
@@ -32,16 +27,12 @@ class DataStoreMiddlewareFactory implements FactoryInterface
      * @param  string $requestedName
      * @param  null|array $options
      * @return object
-     * @throws RestException
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
     public function __invoke(ContainerInterface $container, $requestedName, array $options = null)
     {
-        $resourceName = $requestedName;
-        if (!$container->has($resourceName)) {
-            throw new RestException(
-                'Can\'t make Middleware\DataStoreRest for resource: ' . $resourceName
-            );
-        }
+        $resourceName = $this->getResourceName($requestedName);
         $resourceObject = $container->get($resourceName);
         switch (true) {
             case is_a($resourceObject, 'Zend\Db\TableGateway\TableGateway'):
@@ -55,7 +46,7 @@ class DataStoreMiddlewareFactory implements FactoryInterface
                 break;
             default:
                 if (!isset($storeMiddleware)) {
-                    throw new RestException(
+                    throw new ServiceNotCreatedException(
                         'Can\'t make Middleware\DataStoreRest'
                         . ' for resource: ' . $resourceName
                     );
@@ -63,5 +54,30 @@ class DataStoreMiddlewareFactory implements FactoryInterface
         }
         return $storeMiddleware;
 
+    }
+
+    /**
+     * @param $requestedName
+     * @return string
+     */
+    protected function getResourceName($requestedName) {
+        if(preg_match('/^(?<resourceName>[\w\W]+)DataStoreMiddleware$/', $requestedName, $match)) {
+            return $match["resourceName"];
+        }
+        return "";
+    }
+
+    /**
+     * Can the factory create an instance for the service?
+     *
+     * @param  ContainerInterface $container
+     * @param  string $requestedName
+     * @return bool
+     */
+    public function canCreate(ContainerInterface $container, $requestedName)
+    {
+        $resourceName = $this->getResourceName($requestedName);
+        if(empty($resourceName)) return false;
+        return $container->has($resourceName);
     }
 }

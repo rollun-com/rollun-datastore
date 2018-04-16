@@ -145,17 +145,16 @@ class SqlConditionBuilder extends ConditionBuilderAbstract
     {
         if (!strpos($fieldName, '.')) {
             if ($fieldName == 'id') {
-                $fieldName = $this->db->platform->quoteIdentifier($this->tableName) .
-                    '.' .
-                    $this->db->platform->quoteIdentifier($fieldName);
+                $fieldName = $this->db->platform->quoteIdentifierInFragment("{$this->tableName}.{$fieldName}");
+                /*$fieldName = $this->db->platform->quoteIdentifier($this->tableName) .  '.' .$this->db->platform->quoteIdentifier($fieldName);*/
             } else {
-                $fieldName = $this->db->platform->quoteIdentifier($fieldName);
+                $fieldName = $this->db->platform->quoteIdentifierInFragment("{$fieldName}");
             }
         } else {
+            //TODO: force set tableName!!!!!
             $name = explode('.', $fieldName);
-            $fieldName = $this->db->platform->quoteIdentifier($name[0]) .
-                '.' .
-                $this->db->platform->quoteIdentifier($name[1]);
+            $fieldName = $this->db->platform->quoteIdentifierInFragment("{$name[0]}.{$name[1]}");
+            //$fieldName = $this->db->platform->quoteIdentifier($name[0]) . '.' . $this->db->platform->quoteIdentifier($name[1]);
         }
         return $fieldName;
 

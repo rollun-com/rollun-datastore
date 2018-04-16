@@ -13,9 +13,12 @@ namespace rollun\datastore\Middleware;
 use Interop\Http\ServerMiddleware\DelegateInterface;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface;
+use rollun\actionrender\Renderer\Html\HtmlParamResolver;
+use rollun\actionrender\Renderer\Html\HtmlRenderer;
 use rollun\datastore\DataStore\Interfaces\ReadInterface;
 use rollun\datastore\Rql\RqlQuery;
 use Xiag\Rql\Parser\Node\LimitNode;
+use Xiag\Rql\Parser\Node\SelectNode;
 use Xiag\Rql\Parser\Query;
 use rollun\datastore\DataStore\DataStoreException;
 use rollun\datastore\DataStore\Interfaces\RefreshableInterface;
@@ -92,6 +95,7 @@ class DataStoreRest extends Middleware\DataStoreAbstract
             ], 500);
         }
         $request = $this->request->withAttribute(Response::class, $response);
+        $request = $request->withAttribute(HtmlParamResolver::KEY_ATTRIBUTE_TEMPLATE_NAME, "ds-app::api-datastore");
 
         $response = $delegate->process($request);
 
@@ -174,6 +178,7 @@ class DataStoreRest extends Middleware\DataStoreAbstract
 
         if ($rqlLimitNode) {
             $rqlQueryObject->setLimit(new LimitNode(ReadInterface::LIMIT_INFINITY));
+            $rqlQueryObject->setSelect(new SelectNode([$this->dataStore->getIdentifier()]));
             $count = count($this->dataStore->query($rqlQueryObject));
             $offset = !is_null($rqlLimitNode->getOffset()) ? $rqlLimitNode->getOffset() : '0';
             $limit = !is_null($rqlLimitNode->getLimit()) ?

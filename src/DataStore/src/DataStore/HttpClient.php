@@ -51,6 +51,11 @@ class HttpClient extends DataStoreAbstract
     protected $password;
 
     /**
+     * @var Client
+     */
+    protected $client;
+
+    /**
      * @var array
      */
     protected $options = [];
@@ -58,10 +63,12 @@ class HttpClient extends DataStoreAbstract
     /**
      *
      * @param string $url 'http://example.org'
+     * @param Client $client
      * @param array $options
      */
-    public function __construct($url, $options = null)
+    public function __construct(Client $client, $url, $options = null)
     {
+        $this->client = $client;
         $this->url = rtrim(trim($url), '/');
         if (is_array($options)) {
             if (isset($options['login']) && isset($options['password'])) {
@@ -113,13 +120,14 @@ class HttpClient extends DataStoreAbstract
      */
     protected function initHttpClient($method, Query $query = null, $id = null, $ifMatch = false)
     {
-
         $url = !$id ? $this->url : $this->url . '/' . $this->encodeString($id);
         if (isset($query)) {
             $rqlString = RqlParser::rqlEncode($query);
             $url = $url . '?' . $rqlString;
         }
-        $httpClient = new Client($url, $this->options);
+        $httpClient = clone $this->client;
+        $httpClient->setUri($url);
+        $httpClient->setOptions($this->options);
         $headers['Content-Type'] = 'application/json';
         $headers['Accept'] = 'application/json';
         $headers['APP_ENV'] = constant('APP_ENV');

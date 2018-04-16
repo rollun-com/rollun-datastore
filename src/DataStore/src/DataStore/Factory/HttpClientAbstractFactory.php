@@ -12,6 +12,7 @@ namespace rollun\datastore\DataStore\Factory;
 use Interop\Container\ContainerInterface;
 use rollun\datastore\DataStore\DataStoreException;
 use rollun\datastore\DataStore\HttpClient;
+use Zend\Http\Client;
 
 /**
  * Create and return an instance of the DataStore which based on Http Client
@@ -37,8 +38,13 @@ use rollun\datastore\DataStore\HttpClient;
 class HttpClientAbstractFactory extends DataStoreAbstractFactory
 {
     const KEY_URL = 'url';
+
     const KEY_OPTIONS = 'options';
+
+    const KEY_HTTP_CLIENT = "httpClient";
+
     public static $KEY_DATASTORE_CLASS = HttpClient::class;
+
     protected static $KEY_IN_CREATE = 0;
 
     /**
@@ -56,8 +62,13 @@ class HttpClientAbstractFactory extends DataStoreAbstractFactory
         $config = $container->get('config');
         $serviceConfig = $config[self::KEY_DATASTORE][$requestedName];
         $requestedClassName = $serviceConfig[self::KEY_CLASS];
+        if(isset($serviceConfig[self::KEY_HTTP_CLIENT])) {
+            $packArgs[]/*$httpClient*/ = $container->get($serviceConfig[self::KEY_HTTP_CLIENT]);
+        } else {
+            $packArgs[]/*$httpClient*/ = new Client();
+        }
         if (isset($serviceConfig[self::KEY_URL])) {
-            $url = $serviceConfig[self::KEY_URL];
+            $packArgs[]/*$url*/ = $serviceConfig[self::KEY_URL];
         } else {
             $this::$KEY_IN_CREATE = 0;
             throw new DataStoreException(
@@ -65,11 +76,9 @@ class HttpClientAbstractFactory extends DataStoreAbstractFactory
             );
         }
         if (isset($serviceConfig[self::KEY_OPTIONS])) {
-            $options = $serviceConfig[self::KEY_OPTIONS];
-            $result = new $requestedClassName($url, $options);
-        } else {
-            $result = new $requestedClassName($url);
+            $packArgs[]/*$options*/ = $serviceConfig[self::KEY_OPTIONS];
         }
+        $result = new $requestedClassName(...$packArgs);
         $this::$KEY_IN_CREATE = 0;
         return $result;
     }

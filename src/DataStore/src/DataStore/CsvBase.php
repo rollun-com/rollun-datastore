@@ -316,7 +316,9 @@ class CsvBase extends DataStoreAbstract implements DataSourceInterface
                 if ($item === '""') {
                     $item = '';
                 }
-                if (is_numeric($item)) {
+                //fixed bug with first zero string
+                $isZeroFirstString = /*false;//*/strlen($item) > 1 && substr($item, 0, 1) == "0";
+                if (is_numeric($item) && !$isZeroFirstString) {
                     if (intval($item) == $item) {
                         $item = intval($item);
                     } else {
