@@ -2,7 +2,9 @@
 
 namespace rollun\datastore\Csv;
 
-class CsvFileObject extends \SplFileObject
+use Ajgl\Csv\Rfc;
+
+class CsvFileObject extends Rfc\Spl\SplFileObject
 {
 
     const LOCK_TRIES_TIMEOUT = 50; //in ms
@@ -27,8 +29,8 @@ class CsvFileObject extends \SplFileObject
     public function __construct($filename)
     {
         parent::__construct($filename, 'c+');
-        $this->setFlags(\SplFileObject::READ_CSV | \SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY | \SplFileObject::READ_AHEAD);
-        $this->setCsvControl(',', '"', '"');
+        $this->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY | \SplFileObject::READ_AHEAD); //\SplFileObject::DROP_NEW_LINE |
+        //$this->setCsvControl(',', '"', '"');
         $this->getColumns();
     }
 
@@ -72,7 +74,7 @@ class CsvFileObject extends \SplFileObject
 
     public function getColumns()
     {
-        if (emty($this->columns)) {
+        if (empty($this->columns)) {
             $this->lock(LOCK_SH);
             parent::rewind();
             $current = parent::current();
@@ -82,16 +84,15 @@ class CsvFileObject extends \SplFileObject
         return $this->columns;
     }
 
-//    public function rewind()
-//    {
-//        parent::rewind();
 //
-//        if ($this->isCsvMode()) {
-//            parent::current();
-//            parent::next();
-//            parent::current();
-//        }
-//    }
+    public function rewind()
+    {
+        parent::rewind();
+        parent::current();
+        parent::next();
+        parent::current();
+    }
+
 //
 //    public function key()
 //    {

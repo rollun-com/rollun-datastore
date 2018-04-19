@@ -6,10 +6,8 @@ use rollun\datastore\Csv\CsvFileObject;
 use rollun\installer\Command;
 use rollun\test\datastore\Csv\CsvFileObjectAbstractTest;
 
-class CsvModeOffTest extends CsvFileObjectAbstractTest
+class CsvModeOnTest extends CsvFileObjectAbstractTest
 {
-
-    protected $csvMode = false;
 
     public function testGetColumns()
     {
@@ -21,18 +19,17 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
         $csvFileObject = $this->getCsvFileObject($rows);
 
         $columns = $csvFileObject->getColumns();
-        $this->assertEquals('id,val,"a(""@#$%^&*"', $columns);
+        $this->assertEquals(['id', 'val', 'a("@#$%^&*'], $columns);
     }
 
     public function testCurrent()
     {
         $csvFileObject = $this->getCsvFileObject();
-        $csvFileObject->lock(LOCK_SH);
         $csvFileObject->rewind();
-        $csvFileObject->next();
+        $csvFileObject->lock(LOCK_SH);
         $row = $csvFileObject->current();
         $csvFileObject->unlock();
-        $this->assertEquals('1,one', $row);
+        $this->assertEquals([1, 'one'], $row);
     }
 
     public function testNext()
@@ -42,9 +39,15 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
         $csvFileObject->lock(LOCK_SH);
         $csvFileObject->next();
         $row = $csvFileObject->current();
-        $csvFileObject->unlock();
+        $this->assertEquals([2, 'two'], $row);
+        $csvFileObject->next();
+        $csvFileObject->next();
+        $row = $csvFileObject->current();
+        $this->assertEquals(4, $row[0]);
+        $csvFileObject->next();
 
-        $this->assertEquals('1,one', $row);
+
+        $csvFileObject->unlock();
     }
 
     public function testRewind()
@@ -55,9 +58,7 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
         $csvFileObject->rewind();
         $row = $csvFileObject->current();
         $csvFileObject->unlock();
-        $str = 'id,val';
-
-        $this->assertEquals('id,val', $row);
+        $this->assertEquals([1, 'one'], $row);
     }
 
     public function testValid()
@@ -88,8 +89,6 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
 
         $csvFileObject->lock(LOCK_SH);
         $csvFileObject->rewind();
-        $this->assertEquals(0, $csvFileObject->key());
-        $csvFileObject->next();
         $this->assertEquals(1, $csvFileObject->key());
         $csvFileObject->next();
         $this->assertEquals(2, $csvFileObject->key());
@@ -104,7 +103,7 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
         return array(
 //            [0],
 //            [1],
-            [500000],
+            [5000],
         );
     }
 
@@ -117,7 +116,7 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
         $rows = array(['id', 'val', 'str']);
         for ($index = 1; $index <= $count; $index++) {
             $val = $index * 10;
-            $rows[] = [$index, $val, str_repeat($index, 100)]; // rand(1, 100)//1 + $count - $index
+            $rows[] = [$index, $val, str_repeat($index, rand(1, 10))]; // rand(1, 100)//1 + $count - $index
         }
 
         $csvFileObject = $this->getCsvFileObject($rows);
@@ -126,17 +125,15 @@ class CsvModeOffTest extends CsvFileObjectAbstractTest
         $savedRows = [];
         $time = time();
         foreach ($csvFileObject as $key => $row) {
-            $savedRows = $row;
-            substr_replace($row[2], '1', 1);
-            $row[2] = $row[0] > 100 ? 1 : 0;
+            $savedRows[$key] = $row;
         }
-
-        var_dump('CSV mode OFF testForeach ');
+        var_dump('CSV mode ON testForeach ');
         var_dump(time() - $time);
         var_dump(PHP_EOL);
-        $expectedRows = $this->defaultStrings;
+        $expectedRows = $rows;
+        unset($expectedRows[0]); //'id', 'val', 'str'
         $csvFileObject->unlock();
-        //$this->assertEquals($expectedRows, $savedRows);
+        $this->assertEquals($expectedRows, $savedRows);
     }
 
 }

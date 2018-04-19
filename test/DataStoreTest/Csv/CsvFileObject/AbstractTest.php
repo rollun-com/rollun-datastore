@@ -1,6 +1,6 @@
 <?php
 
-namespace rollun\test\datastore\Csv;
+namespace rollun\test\datastore\Csv\CsvFileObject;
 
 use rollun\datastore\Csv\CsvFileObject;
 use rollun\installer\Command;
@@ -15,24 +15,15 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
     protected $defaultArray;
     protected $defaultStrings;
 
+    public function __construct($name = null, array $data = array(), $dataName = '')
+    {
+        parent::__construct($name, $data, $dataName);
+        $this->fullFilename = $this->getFullFilename(static::CSV_TESTS_FILENAME);
+    }
+
     public function setUp()
     {
-        $this->fullFilename = $this->getFullFilename(static::CSV_TESTS_FILENAME);
-        $this->defaultArray = array(
-            ['id', 'val'],
-            [1, 'one'],
-            [2, 'two'],
-            [3, 'three'],
-            [4, 'four']
-        );
 
-        $this->defaultStrings = array(
-            "id,val",
-            "1,one",
-            "2,two",
-            "3,three",
-            "4,four"
-        );
     }
 
     public function tearDown()
@@ -54,52 +45,67 @@ abstract class CsvFileObjectAbstractTest extends \PHPUnit_Framework_TestCase
 
     /**
      *
-     * @param array $rows array of strings or arrays
+     * @param array $stringsArray array of strings
      * @return string
      */
-    protected function writeDataToCsv($rows = null)
+    protected function writeToCsvStringByString($stringsArray = null)
     {
         $stream = fopen($this->fullFilename, 'w+');
         flock($stream, LOCK_EX);
-        foreach ($rows as $fields) {
-            if (is_array($fields)) {
-                fputcsv($stream, $fields);
-            } else {
-                fwrite($stream, $fields);
-            }
+        foreach ($stringsArray as $string) {
+            fwrite($stream, $string . PHP_EOL);
         }
         fflush($stream);
         flock($stream, LOCK_UN);
         fclose($stream);
-
         return $this->fullFilename;
     }
 
-    protected function getCsvFileObject($rows = null)
+    /**
+     *
+     * @param array $stringsArray array of strings
+     * @return string
+     */
+    protected function readFromCsvStringByString()
     {
-        $rows = $rows ?? $this->defaultArray;
-        $csvFileObject = new CsvFileObject($this->writeDataToCsv($rows));
-        return $csvFileObject;
+        $stream = fopen($this->fullFilename, 'r');
+        flock($stream, LOCK_EX);
+        $stringsArray = [];
+        while (!feof($stream)) {
+            $stringsArray[] = fread($stream, 8192);
+        }
+        flock($stream, LOCK_UN);
+        fclose($stream);
+        return $stringsArray;
     }
 
-    public function testClassCsvFileObject()
+    public function testCsvFileObjectFgetcsvRfc()
     {
-        $csvFileObject = $this->getCsvFileObject();
-
-        $this->assertEquals(CsvFileObject::class, get_class($csvFileObject));
+        $csvFileObject = new CsvFileObject($this->fullFilename);
+        $this->writeToCsvStringByString(
+                array(
+                    "'id', 'val'",
+                    [1, '"Hello\" World!']
+                )
+        );
         $csvFileObject->lock(LOCK_SH);
-        $row = $csvFileObject->fgetcsv();
+        $row0 = $csvFileObject->fgetcsv();
+        $row1 = $csvFileObject->fgetcsv();
+        $this->assertEquals([1, '"Hello\" World!'], $row1);
         $csvFileObject->unlock();
-        $this->assertEquals(['id', 'val'], $row);
     }
 
-    public function testCsvFileObjectFgetcsv()
+//
+    public function deleteRowProvider()
     {
-        $csvFileObject = $this->getCsvFileObject();
-        $csvFileObject->lock(LOCK_SH);
-        $row = $csvFileObject->fgetcsv();
-        $csvFileObject->unlock();
-        $this->assertEquals(['id', 'val'], $row);
+        //$count, $indexForDelete
+        return array(
+            [10, 1],
+            [10, 2],
+            [10, 9],
+            [10, 10],
+                //[100000, 5000],
+        );
     }
 
 //

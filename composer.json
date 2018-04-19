@@ -26,7 +26,8 @@
         "rollun-com/rollun-utils": "^4.0",
         "rollun-com/rollun-installer": "^4.0",
         "rollun-com/rollun-actionrender": "^6.0",
-        "http-interop/http-middleware": "0.4.1"
+        "http-interop/http-middleware": "0.4.1",
+        "ajgl/csv-rfc": "^0.2.0"
     },
     "require-dev": {
         "zendframework/zend-component-installer": "^1.1",
