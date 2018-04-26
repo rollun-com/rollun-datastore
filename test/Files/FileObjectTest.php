@@ -110,9 +110,74 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
         $fileObject = $this->getFileObject($strings);
         $fileObject->deleteRow($indexForDelete);
         $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
+
         $string = $fileObject->fread(10);
+        unset($fileObject);
 
         $this->assertEquals($expected, $string);
+    }
+
+    public function moveSubStrProvider()
+    {
+        //$maxIndex, $indexForDelete
+        return array(
+            [3, 1, '012345', '0345'],
+            [5, 0, '012345', '5'],
+            [1, 3, '012345', '01212345'],
+            [1, 5, '012345', '0123412345'],
+            [1, 6, '012345', '01234512345'],
+            [0, 6, '012345', '012345012345'],
+            [0, 1, '012345', '0012345'],
+            [0, 7, '012345', "012345\n012345"],
+            [0, 10, '012345', pack('a10a6', "012345\n", "012345\n")],
+            [0, 3, "012345678", '012012345678'],
+            [0, 4, "0123456789ABCD", "01230123456789ABCD"],
+        );
+    }
+
+    /**
+     *
+     * @param int $maxIndex
+     * @param int $indexForDelete
+     * @dataProvider moveSubStrProvider
+     */
+    public function testMoveSubStr($charPosFrom, $newCharPos, $string, $expected)
+    {
+        $fileObject = $this->getFileObject([$string]);
+        $fileObject->moveSubStr($charPosFrom, $newCharPos);
+        $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
+        $fileObject->fseek(0);
+        $stringAfterMove = $fileObject->fread($fileObject->getSize());
+        unset($fileObject);
+        $this->assertEquals($expected, rtrim($stringAfterMove, "\n"));
+    }
+
+    public function insertStringProvider()
+    {
+        //$maxIndex, $indexForDelete
+        return array(
+            [['012345'], 'ABC', 1, "012345\nABC"],
+            [['012345'], 'ABC', 0, "ABC\n012345"],
+            [['012345', '543210'], 'ABC', 1, "012345\nABC\n543210"],
+            [['012345', '543210'], 'ABC', 0, "ABC\n012345\n543210"],
+        );
+    }
+
+    /**
+     *
+     * @param int $maxIndex
+     * @param int $indexForDelete
+     * @dataProvider insertStringProvider
+     */
+    public function testInsertString($strings, $insertedString, $beforeLinePos, $expected)
+    {
+        $fileObject = $this->getFileObject($strings);
+        $fileObject->insertString($insertedString, $beforeLinePos);
+        $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
+        $fileObject->fseek(0);
+        $stringAfterInsert = $fileObject->fread($fileObject->getSize());
+        unset($fileObject);
+        $this->assertEquals($expected, rtrim($stringAfterInsert, "\n"));
     }
 
 }

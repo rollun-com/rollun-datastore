@@ -13,7 +13,7 @@ class FileObject extends Rfc\Spl\SplFileObject
     /**
      * Buffer size in lines for coping operation
      */
-    const BUFFER_SIZE = 100;  //i
+    const BUFFER_SIZE = 10;  //i
 
     /**
      *
@@ -67,60 +67,127 @@ class FileObject extends Rfc\Spl\SplFileObject
 
     public function deleteRow($linePos)
     {
-
-//$this->csvModeOff();
         $this->lock(LOCK_EX);
         $flags = $this->getFlags();
         $this->setFlags(0);
         if ($linePos === 0) {
             $this->rewind();
-            $charPosTo = 0;
+            $newCharPos = 0;
         } else {
             parent::seek($linePos - 1);
             parent::current();
-            $charPosTo = $this->ftell();
+            $newCharPos = $this->ftell();
             parent::next();
         }
-
         parent::current();
         $charPosFrom = $this->ftell();
-
-
-
-
-        $truncatePos = $this->moveRows($charPosFrom, $charPosTo);
-
-        $this->fflush();
-        $this->ftruncate($truncatePos);
+        $this->moveBackward($charPosFrom, $newCharPos);
         $this->setFlags($flags);
         $this->unlock();
     }
 
-    protected function moveRows($charPosFrom, $charPosTo)
+    /**
+     *
+     * @param string $string string for insert. \n will be added if not exist.
+     * @param type $beforeLinePos zero based line number. null for uppend to the end of file.
+     */
+    public function insertString($insertedString, $beforeLinePos = null)
     {
-        $this->fseek($charPosFrom);
-        parent::current();
-        while ($this->valid()) {
-            $this->fseek($charPosFrom);
-            parent::current();
-
-            $buffer = [];
-            while ($this->valid() && count($buffer) <= static::BUFFER_SIZE) {
-                $buffer[] = $this->current();
-                $charPosFrom = $this->ftell();
-                $this->next();
-            }
-
-            $this->fseek($charPosTo);
-            foreach ($buffer as $key => $line) {
-                $this->fwrite($line);  //$this->fputcsv($line); in csv mode
-                $charPosTo = $this->ftell();
-            }
-
-            $this->fseek($charPosFrom);
-            $current = parent::current();
+        $insertedString = rtrim($insertedString, "\r\n") . "\n";
+        if (is_null($beforeLinePos)) {
+            $this->fseek(0, SEEK_END);
+            $this->fwrite($insertedString);
+            return;
         }
-        return $charPosTo;
+
+        $this->lock(LOCK_EX);
+        $flags = $this->getFlags();
+        $this->setFlags(0);
+        if ($beforeLinePos === 0) {
+            $charPosFrom = 0;
+        } else {
+            parent::seek($beforeLinePos - 1);
+            parent::current();
+            $charPosFrom = $this->ftell();
+        }
+        $newCharPos = $charPosFrom + strlen($insertedString);
+        $this->fseek(0);
+        $this->moveForward($charPosFrom, $newCharPos);
+        $this->fseek($charPosFrom);
+        $this->fwrite($insertedString);
+        $this->setFlags($flags);
+        $this->unlock();
+    }
+
+    /**
+     * Move last part of file (from $charPosFrom to EOF) to $newCharPos
+     *
+     * @param int $charPosFrom
+     * @param int $newCharPos
+     * @return int truncate position
+     */
+    public function moveSubStr($charPosFrom, $newCharPos)
+    {
+        $this->lock(LOCK_EX);
+        $flags = $this->getFlags();
+        $this->setFlags(0);
+        switch (true) {
+            case $charPosFrom < $newCharPos:
+                $this->moveForward($charPosFrom, $newCharPos);
+                break;
+            case $charPosFrom > $newCharPos:
+                $this->moveBackward($charPosFrom, $newCharPos);
+                break;
+            default:
+                break;
+        }
+        $this->setFlags($flags);
+        $this->unlock();
+    }
+
+    protected function moveForward($charPosFrom, $newCharPos)
+    {
+        $this->fseek(0, SEEK_END);
+        $fileSize = $this->ftell();
+        $bufferSize = ($charPosFrom + static::BUFFER_SIZE) > $fileSize ? $fileSize - $charPosFrom : static::BUFFER_SIZE;
+        $charPosForRead = $fileSize - $bufferSize;
+        $charPosForWrite = $fileSize + $newCharPos - $charPosFrom - $bufferSize;
+        while ($bufferSize > 0) {
+            if ($this->fseek($charPosForRead) == -1) {
+                throw new \InvalidArgumentException('$charPosForRead =' . $charPosForRead . " in file: \n" . $this->getRealPath());
+            }
+            $buffer = $this->fread($bufferSize);
+            if ($this->fseek($charPosForWrite) == -1) {
+                throw new \InvalidArgumentException('$charPosForWrite =' . $charPosForWrite . " in file: \n" . $this->getRealPath());
+            }
+            $this->fwrite($buffer);
+            $bufferSize = ($charPosFrom + static::BUFFER_SIZE) > $charPosForRead ? $charPosForRead - $charPosFrom : static::BUFFER_SIZE;
+            $charPosForRead = $charPosForRead - $bufferSize;
+            $charPosForWrite = $charPosForWrite - $bufferSize;
+        }
+        $this->fflush();
+    }
+
+    protected function moveBackward($charPosFrom, $newCharPos)
+    {
+        $this->fseek(0, SEEK_END);
+        $fileSize = $this->ftell();
+        $this->fseek($charPosFrom);
+        while ($charPosFrom < $fileSize) {
+            if ($this->fseek($charPosFrom) == -1) {
+                throw new \InvalidArgumentException('$charPosFrom =' . $charPosFrom . " in file: \n" . $this->getRealPath());
+            }
+            $bufferSize = ($charPosFrom + static::BUFFER_SIZE) > $fileSize ? $fileSize - $charPosFrom : static::BUFFER_SIZE;
+            $buffer = $this->fread($bufferSize);
+            $charPosFrom = $this->ftell();
+            if ($this->fseek($newCharPos) == -1) {
+                throw new \InvalidArgumentException('$newCharPos =' . $newCharPos . " in file: \n" . $this->getRealPath());
+            }
+            $this->fwrite($buffer);
+            $newCharPos = $this->ftell();
+        }
+        $this->fflush();
+        $this->ftruncate($newCharPos);
     }
 
 }

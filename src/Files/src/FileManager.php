@@ -119,7 +119,7 @@ class FileManager
         if (file_exists($fullFilename) && is_file($fullFilename)) {
             if ($rewriteIfExist) {
                 $stream = $this->openFile($fullFilename, 'c+');
-                $this->lockEx($stream);
+                $this->lockEx($stream, $fullFilename);
                 ftruncate($stream, 0);
                 return $stream;
             } else {
