@@ -51,7 +51,7 @@
         "psr-4": {
             "rollun\\test\\datastore\\": "test/DataStoreTest",
             "rollun\\test\\uploader\\": "test/UploaderTest",
-            "rollun\\test\\files\\": "test/Files/src"
+            "rollun\\test\\files\\": "test/FilesTest"
         }
     },
     "scripts": {

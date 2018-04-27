@@ -1,37 +1,26 @@
 <?php
 
-namespace rollun\test\files;
+namespace rollun\test\files\FileObject;
 
-use rollun\files\FileObject;
-use rollun\files\FileManager;
-
-class FileObjectTest extends \PHPUnit_Framework_TestCase
+class ChangeableTest extends AbstractTest
 {
-
-    public function getFileObject($stringsArray)
-    {
-        $fileManager = new FileManager;
-        $fileManager->createDir('data/FilesTests/FileObjectTest');
-        $fullFilename = $fileManager->joinPath('data/FilesTests/FileObjectTest', 'fileObjectTest.txt');
-        $stream = $fileManager->createAndOpenFile($fullFilename, true);
-        foreach ($stringsArray as $string) {
-            fwrite($stream, $string . "\n");
-        }
-        $fileManager->closeStream($stream);
-        $fileObject = new FileObject($fullFilename);
-        $fileObject->setFlags(\SplFileObject::READ_AHEAD);
-        return $fileObject;
-    }
 
     public function deleteRowProvider1()
     {
         //$maxIndex, $indexForDelete
         return array(
-            [10, 0],
-            [10, 1],
-            [10, 10],
-            // [10000, 500],
-            [10, 5],
+            [10, 0, 5],
+            [10, 1, 5],
+            [10, 4, 5],
+            [10, 5, 5],
+            [10, 6, 5],
+            [10, 10, 5],
+            [10, 0, 10],
+            [10, 10, 10],
+            [10, 0, 15],
+            [10, 1, 15],
+            [10, 5, 15],
+            [10, 10, 15],
         );
     }
 
@@ -41,7 +30,7 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
      * @param int $indexForDelete
      * @dataProvider deleteRowProvider1
      */
-    public function test1DeleteRow($maxIndex, $indexForDelete)
+    public function test1DeleteRow($maxIndex, $indexForDelete, $maxBufferSize)
     {
 
         for ($index = 0; $index <= $maxIndex; $index++) {
@@ -51,15 +40,11 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
                 $expectedRows[] = $val . "\n";
             }
         }
-        $fileObject = $this->getFileObject($rows);
-
-        $savedRows = [];
-        foreach ($fileObject as $key => $row) {
-            $savedRows[$key] = $row; //[1];
-        }
+        $fileObject = $this->getFileObject();
+        $fileObject->setMaxBufferSize($maxBufferSize);
+        $this->fillFile($fileObject, $rows);
 
         $fileObject->deleteRow($indexForDelete);
-
         $savedRows = [];
         //$fileObject->csvModeOn();
         foreach ($fileObject as $key => $row) {
@@ -86,7 +71,7 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
 
     public function deleteRowProvider2()
     {
-        //$maxIndex, $indexForDelete
+        //$indexForDelete, $strings, $expected
         return array(
             [0, ["0", "1"], "1\n"],
             [1, ["0", "1"], "0\n"],
@@ -107,7 +92,8 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
      */
     public function test2DeleteRow($indexForDelete, $strings, $expected)
     {
-        $fileObject = $this->getFileObject($strings);
+        $fileObject = $this->getFileObject();
+        $this->fillFile($fileObject, $strings);
         $fileObject->deleteRow($indexForDelete);
         $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
 
@@ -119,7 +105,7 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
 
     public function moveSubStrProvider()
     {
-        //$maxIndex, $indexForDelete
+        //$charPosFrom, $newCharPos, $string, $expected
         return array(
             [3, 1, '012345', '0345'],
             [5, 0, '012345', '5'],
@@ -143,7 +129,8 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
      */
     public function testMoveSubStr($charPosFrom, $newCharPos, $string, $expected)
     {
-        $fileObject = $this->getFileObject([$string]);
+        $fileObject = $this->getFileObject();
+        $this->fillFile($fileObject, [$string]);
         $fileObject->moveSubStr($charPosFrom, $newCharPos);
         $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
         $fileObject->fseek(0);
@@ -154,7 +141,7 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
 
     public function insertStringProvider()
     {
-        //$maxIndex, $indexForDelete
+        //$strings, $insertedString, $beforeLinePos, $expected
         return array(
             [['012345'], 'ABC', 1, "012345\nABC"],
             [['012345'], 'ABC', 0, "ABC\n012345"],
@@ -171,7 +158,8 @@ class FileObjectTest extends \PHPUnit_Framework_TestCase
      */
     public function testInsertString($strings, $insertedString, $beforeLinePos, $expected)
     {
-        $fileObject = $this->getFileObject($strings);
+        $fileObject = $this->getFileObject();
+        $this->fillFile($fileObject, $strings);
         $fileObject->insertString($insertedString, $beforeLinePos);
         $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
         $fileObject->fseek(0);

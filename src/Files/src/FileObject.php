@@ -7,13 +7,19 @@ use Ajgl\Csv\Rfc;
 class FileObject extends Rfc\Spl\SplFileObject
 {
 
-    const LOCK_TRIES_TIMEOUT = 50; //in ms
-    const MAX_LOCK_TRIES = 40;
+    const DELAULT_LOCK_TRIES_TIMEOUT = 50; //in ms
+    const DELAULT_MAX_LOCK_TRIES = 40;
 
     /**
-     * Buffer size in lines for coping operation
+     * Buffer size in  bytes for coping operation
      */
-    const BUFFER_SIZE = 10;  //i
+    const DELAULT_MAX_BUFFER_SIZE = 10000000;
+
+    public $lockTriesTimeout;
+    public $maxLockTries;
+    protected $maxBufferSize;
+    protected $lockModesStack;
+    protected $prevLockMode;
 
     /**
      *
@@ -24,7 +30,10 @@ class FileObject extends Rfc\Spl\SplFileObject
     {
         parent::__construct($filename, 'c+');
         $this->setFlags(\SplFileObject::READ_AHEAD); //| \SplFileObject::DROP_NEW_LINE | \SplFileObject::READ_AHEAD |\SplFileObject: \SplFileObject::SKIP_EMPTY
-        //$this->setCsvControl(',', '"', '"');
+        $this->setMaxBufferSize(static::DELAULT_MAX_BUFFER_SIZE);
+        $this->lockTriesTimeout = static::DELAULT_LOCK_TRIES_TIMEOUT;
+        $this->maxLockTries = static::DELAULT_MAX_LOCK_TRIES;
+        $this->currentLockMode = 0;
     }
 
     public function __destruct()
@@ -32,17 +41,26 @@ class FileObject extends Rfc\Spl\SplFileObject
         $this->unlock();
     }
 
+    public function setMaxBufferSize($maxBufferSize)
+    {
+        $this->maxBufferSize = $maxBufferSize;
+    }
+
+    public function getMaxBufferSize()
+    {
+        return $this->maxBufferSize;
+    }
+
     /**
      *
      * @param int  $lockMode LOCK_SH or LOCK_EX
-     * @param type $maxTries
-     * @param type $timeout in ms
-     * @throws DataStoreException
+     * @param type $maxLockTries
+     * @param type $lockTriesTimeout in ms
      */
-    public function lock($lockMode, $maxTries = null, $lockTriesTimeout = null)
+    public function lock($lockMode, $maxLockTries = null, $lockTriesTimeout = null)
     {
-        $maxTries = $maxTries ?? static::MAX_LOCK_TRIES;
-        $lockTriesTimeout = $lockTriesTimeout ?? static::LOCK_TRIES_TIMEOUT;
+        $maxTries = $maxLockTries ?? $this->maxLockTries;
+        $triesTimeout = $lockTriesTimeout ?? $this->lockTriesTimeout;
 
         if ($lockMode <> LOCK_SH && $lockMode <> LOCK_EX) {
             throw new \InvalidArgumentException('$lockMode must be LOCK_SH or LOCK_EX');
@@ -51,13 +69,14 @@ class FileObject extends Rfc\Spl\SplFileObject
         $count = 0;
         while (!$this->flock($lockMode | LOCK_NB, $wouldblock)) {
             if (!$wouldblock) {
-                throw new DataStoreException('There is a problem with file: ' . $this->filename);
+                throw new \RuntimeException('There is a problem with file: ' . $this->getRealPath());
             }
             if ($count++ > $maxTries) {
-                throw new DataStoreException('Can not lock the file: ' . $this->filename);
+                throw new \RuntimeException('Can not lock the file: ' . $this->getRealPath());
             }
-            usleep($lockTriesTimeout);
+            usleep($triesTimeout);
         }
+        return TRUE;
     }
 
     public function unlock()
@@ -67,56 +86,57 @@ class FileObject extends Rfc\Spl\SplFileObject
 
     public function deleteRow($linePos)
     {
-        $this->lock(LOCK_EX);
-        $flags = $this->getFlags();
-        $this->setFlags(0);
+        $flags = $this->clearFlags();
         if ($linePos === 0) {
             $this->rewind();
             $newCharPos = 0;
         } else {
-            parent::seek($linePos - 1);
-            parent::current();
+            $this->seek($linePos - 1);
+            $this->current();
             $newCharPos = $this->ftell();
-            parent::next();
+            $this->next();
         }
-        parent::current();
+        $this->current();
         $charPosFrom = $this->ftell();
         $this->moveBackward($charPosFrom, $newCharPos);
-        $this->setFlags($flags);
-        $this->unlock();
+        $this->restoreFlags($flags);
+    }
+
+    public function fseekWithCheck($offset, $whence = SEEK_SET)
+    {
+        if ($this->fseek($offset, $whence) == -1) {
+            throw new \RuntimeException('$charPosForRead =' . $charPosForRead . " in file: \n" . $this->getRealPath());
+        }
+        return 0;
     }
 
     /**
      *
-     * @param string $string string for insert. \n will be added if not exist.
+     * @param string $insertedString string for insert. \n will be added if not exist.
      * @param type $beforeLinePos zero based line number. null for uppend to the end of file.
      */
     public function insertString($insertedString, $beforeLinePos = null)
     {
         $insertedString = rtrim($insertedString, "\r\n") . "\n";
         if (is_null($beforeLinePos)) {
-            $this->fseek(0, SEEK_END);
+            $this->fseekWithCheck(0, SEEK_END);
             $this->fwrite($insertedString);
             return;
         }
 
-        $this->lock(LOCK_EX);
-        $flags = $this->getFlags();
-        $this->setFlags(0);
+        $flags = $this->clearFlags();
         if ($beforeLinePos === 0) {
             $charPosFrom = 0;
         } else {
-            parent::seek($beforeLinePos - 1);
-            parent::current();
+            $this->seek($beforeLinePos - 1);
+            $this->current();
             $charPosFrom = $this->ftell();
         }
         $newCharPos = $charPosFrom + strlen($insertedString);
-        $this->fseek(0);
         $this->moveForward($charPosFrom, $newCharPos);
-        $this->fseek($charPosFrom);
+        $this->fseekWithCheck($charPosFrom);
         $this->fwrite($insertedString);
-        $this->setFlags($flags);
-        $this->unlock();
+        $this->restoreFlags($flags);
     }
 
     /**
@@ -128,40 +148,43 @@ class FileObject extends Rfc\Spl\SplFileObject
      */
     public function moveSubStr($charPosFrom, $newCharPos)
     {
-        $this->lock(LOCK_EX);
-        $flags = $this->getFlags();
-        $this->setFlags(0);
-        switch (true) {
-            case $charPosFrom < $newCharPos:
-                $this->moveForward($charPosFrom, $newCharPos);
-                break;
-            case $charPosFrom > $newCharPos:
-                $this->moveBackward($charPosFrom, $newCharPos);
-                break;
-            default:
-                break;
+        if ($charPosFrom === $newCharPos) {
+            return;
         }
-        $this->setFlags($flags);
-        $this->unlock();
+        $flags = $this->clearFlags();
+        if ($charPosFrom < $newCharPos) {
+            $this->moveForward($charPosFrom, $newCharPos);
+        } else {
+            $this->moveBackward($charPosFrom, $newCharPos);
+        }
+        $this->restoreFlags($flags);
+    }
+
+    protected function clearFlags()
+    {
+        $flagsForRestore = $this->getFlags();
+        $this->setFlags($flagsForRestore & \SplFileObject::READ_CSV);
+        return $flagsForRestore;
+    }
+
+    protected function restoreFlags($flagsForRestore)
+    {
+        $this->setFlags($flagsForRestore);
     }
 
     protected function moveForward($charPosFrom, $newCharPos)
     {
-        $this->fseek(0, SEEK_END);
+        $this->fseekWithCheck(0, SEEK_END);
         $fileSize = $this->ftell();
-        $bufferSize = ($charPosFrom + static::BUFFER_SIZE) > $fileSize ? $fileSize - $charPosFrom : static::BUFFER_SIZE;
+        $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $fileSize ? $fileSize - $charPosFrom : $this->getMaxBufferSize();
         $charPosForRead = $fileSize - $bufferSize;
         $charPosForWrite = $fileSize + $newCharPos - $charPosFrom - $bufferSize;
         while ($bufferSize > 0) {
-            if ($this->fseek($charPosForRead) == -1) {
-                throw new \InvalidArgumentException('$charPosForRead =' . $charPosForRead . " in file: \n" . $this->getRealPath());
-            }
+            $this->fseekWithCheck($charPosForRead);
             $buffer = $this->fread($bufferSize);
-            if ($this->fseek($charPosForWrite) == -1) {
-                throw new \InvalidArgumentException('$charPosForWrite =' . $charPosForWrite . " in file: \n" . $this->getRealPath());
-            }
+            $this->fseekWithCheck($charPosForWrite);
             $this->fwrite($buffer);
-            $bufferSize = ($charPosFrom + static::BUFFER_SIZE) > $charPosForRead ? $charPosForRead - $charPosFrom : static::BUFFER_SIZE;
+            $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $charPosForRead ? $charPosForRead - $charPosFrom : $this->getMaxBufferSize();
             $charPosForRead = $charPosForRead - $bufferSize;
             $charPosForWrite = $charPosForWrite - $bufferSize;
         }
@@ -170,19 +193,15 @@ class FileObject extends Rfc\Spl\SplFileObject
 
     protected function moveBackward($charPosFrom, $newCharPos)
     {
-        $this->fseek(0, SEEK_END);
+        $this->fseekWithCheck(0, SEEK_END);
         $fileSize = $this->ftell();
-        $this->fseek($charPosFrom);
+        $this->fseekWithCheck($charPosFrom);
         while ($charPosFrom < $fileSize) {
-            if ($this->fseek($charPosFrom) == -1) {
-                throw new \InvalidArgumentException('$charPosFrom =' . $charPosFrom . " in file: \n" . $this->getRealPath());
-            }
-            $bufferSize = ($charPosFrom + static::BUFFER_SIZE) > $fileSize ? $fileSize - $charPosFrom : static::BUFFER_SIZE;
+            $this->fseekWithCheck($charPosFrom);
+            $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $fileSize ? $fileSize - $charPosFrom : $this->getMaxBufferSize();
             $buffer = $this->fread($bufferSize);
             $charPosFrom = $this->ftell();
-            if ($this->fseek($newCharPos) == -1) {
-                throw new \InvalidArgumentException('$newCharPos =' . $newCharPos . " in file: \n" . $this->getRealPath());
-            }
+            $this->fseekWithCheck($newCharPos);
             $this->fwrite($buffer);
             $newCharPos = $this->ftell();
         }

@@ -1,26 +1,9 @@
 <?php
 
-namespace rollun\test\files;
+namespace rollun\test\files\FileObject;
 
-use rollun\files\FileObject;
-use rollun\files\FileManager;
-
-class FileObjectFlagsTest extends \PHPUnit_Framework_TestCase
+class FlagsTest extends AbstractTest
 {
-
-    public function getFileObject($stringsArray)
-    {
-        $fileManager = new FileManager;
-        $fileManager->createDir('data/FilesTests/FileObjectTest');
-        $fullFilename = $fileManager->joinPath('data/FilesTests/FileObjectTest', 'fileObjectFlagsTest.txt');
-        $stream = $fileManager->createAndOpenFile($fullFilename, true);
-        foreach ($stringsArray as $string) {
-            fwrite($stream, $string);
-        }
-        $fileManager->closeStream($stream);
-        $fileObject = new FileObject($fullFilename);
-        return $fileObject;
-    }
 
     public function stringsRowProvider()
     {
@@ -66,14 +49,19 @@ class FileObjectFlagsTest extends \PHPUnit_Framework_TestCase
     public function testFlags($flags, $strings, $expected = null)
     {
         $expected = $expected ?? $strings;
-        $fileObject = $this->getFileObject($strings);
+        $fileObject = $this->getFileObject();
+        $fileObject->ftruncate(0);
+        foreach ($strings as $string) {
+            $fileObject->fwrite($string);
+        }
+        $fileObject->fseek(0);
         $fileObject->setFlags($flags);
-
         $savedRows = [];
 
         foreach ($fileObject as $key => $row) {
             $savedRows[$key] = $row; //[1];
         }
+
 
         $this->assertEquals($expected, $savedRows);
     }
