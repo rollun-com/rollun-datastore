@@ -142,4 +142,14 @@ class FlagsTest extends AbstractTest
         $this->assertEquals($expected, $actual);
     }
 
+    public function testSize()
+    {
+        $fileObject = $this->getFileObject();
+        $this->assertEquals(0, $fileObject->size());
+        $string = str_repeat('A', 10);
+        $fileObject->fwrite($string);
+        $fileObject->fseekWithCheck(0);
+        $this->assertEquals(10, $fileObject->size());
+    }
+
 }

@@ -5,7 +5,7 @@ namespace rollun\test\files\FileObject;
 class ChangeableTest extends AbstractTest
 {
 
-    public function deleteRowProvider1()
+    public function deleteStringProvider1()
     {
         //$maxIndex, $indexForDelete
         return array(
@@ -28,9 +28,9 @@ class ChangeableTest extends AbstractTest
      *
      * @param int $maxIndex
      * @param int $indexForDelete
-     * @dataProvider deleteRowProvider1
+     * @dataProvider deleteStringProvider1
      */
-    public function test1DeleteRow($maxIndex, $indexForDelete, $maxBufferSize)
+    public function test1DeleteString($maxIndex, $indexForDelete, $maxBufferSize)
     {
 
         for ($index = 0; $index <= $maxIndex; $index++) {
@@ -44,7 +44,7 @@ class ChangeableTest extends AbstractTest
         $fileObject->setMaxBufferSize($maxBufferSize);
         $this->fillFile($fileObject, $rows);
 
-        $fileObject->deleteRow($indexForDelete);
+        $fileObject->deleteString($indexForDelete);
         $savedRows = [];
         //$fileObject->csvModeOn();
         foreach ($fileObject as $key => $row) {
@@ -69,7 +69,7 @@ class ChangeableTest extends AbstractTest
         $this->assertEquals($expectedRows[$maxIndex - 1], $savedRows[$maxIndex - 1]);
     }
 
-    public function deleteRowProvider2()
+    public function deleteStringProvider2()
     {
         //$indexForDelete, $strings, $expected
         return array(
@@ -88,13 +88,13 @@ class ChangeableTest extends AbstractTest
      *
      * @param int $maxIndex
      * @param int $indexForDelete
-     * @dataProvider deleteRowProvider2
+     * @dataProvider deleteStringProvider2
      */
-    public function test2DeleteRow($indexForDelete, $strings, $expected)
+    public function test2DeleteString($indexForDelete, $strings, $expected)
     {
         $fileObject = $this->getFileObject();
         $this->fillFile($fileObject, $strings);
-        $fileObject->deleteRow($indexForDelete);
+        $fileObject->deleteString($indexForDelete);
         $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
 
         $string = $fileObject->fread(10);
@@ -128,23 +128,6 @@ class ChangeableTest extends AbstractTest
      * @param int $indexForDelete
      * @dataProvider moveSubStrProvider
      */
-    public function MoveSubStrInWeb()
-    {
-        $strs = $this->moveSubStrProvider();
-        foreach ($strs as $key => $value) {
-
-            $testResulr = $this->testMoveSubStr($value[0], $value[1], $value[2], $value[3]);
-
-            echo("\n=============================\n<br>\n<br>");
-        }
-    }
-
-    /**
-     *
-     * @param int $maxIndex
-     * @param int $indexForDelete
-     * @dataProvider moveSubStrProvider
-     */
     public function testMoveSubStr($charPosFrom, $newCharPos, $string, $expected)
     {
         $fileObject = $this->getFileObject();
@@ -161,13 +144,7 @@ class ChangeableTest extends AbstractTest
         $fileObject->unlock();
         unset($fileObject);
         $actual = rtrim($stringAfterMove, "\n");
-        if (php_sapi_name() === 'cli') {
-            $this->assertEquals($expected, $actual);
-        } else {
-            echo(((string) (int) (trim($expected) == trim($actual))) . "  !!!!!! \n<br>");
-            $res = "\n<br>" . $expected . '       ' . $actual . "\n<br>";
-            echo($res);
-        }
+        $this->assertEquals($expected, $actual);
     }
 
     public function insertStringProvider()
@@ -199,6 +176,50 @@ class ChangeableTest extends AbstractTest
         $stringAfterInsert = $fileObject->fread($fileSize);
         unset($fileObject);
         $this->assertEquals($expected, rtrim($stringAfterInsert, "\n"));
+    }
+
+    public function rewriteStringProvider()
+    {
+        //$newStrings, $inLinePos
+        return array(
+            ["012345", 1],
+            ["", 1],
+            ["012345", 0],
+            ["", 0],
+            ["012345", 3],
+            ["", 3],
+            ["012345", 5],
+            ["", 5],
+            ["012345", 6],
+        );
+    }
+
+    /**
+     *
+     * @dataProvider rewriteStringProvider
+     */
+    public function testRewriteString($newString, $inLinePos)
+    {
+        $fileObject = $this->getFileObject();
+        $strings = [
+            'aaa',
+            'bbbb',
+            'cc',
+            '',
+            "d\nd"
+        ];
+        $this->fillFile($fileObject, $strings);
+        $fileObject->rewriteString($newString, $inLinePos);
+        $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
+        if ($inLinePos === 0) {
+            $fileObject->rewind();
+        } else {
+            $fileObject->seek($inLinePos - 1);
+            $fileObject->current();
+        }
+        $actual = $fileObject->fgets();
+        $expected = rtrim($newString, "\r\n") . "\n";
+        $this->assertEquals($expected, $actual);
     }
 
 }
