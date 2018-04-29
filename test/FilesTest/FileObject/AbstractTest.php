@@ -28,6 +28,7 @@ abstract class AbstractTest extends \PHPUnit_Framework_TestCase
         $fileObject->ftruncate(0);
         foreach ($stringsArray as $string) {
             $fileObject->fwrite(rtrim($string, "\n\r") . "\n");
+            $fileObject->fflush();
         }
         $fileObject->fseek(0);
     }

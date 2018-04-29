@@ -66,4 +66,80 @@ class FlagsTest extends AbstractTest
         $this->assertEquals($expected, $savedRows);
     }
 
+    public function changeFileSize()
+    {
+        //$fileSize, $newFileSize
+        return array(
+            [1, 1],
+            [10, 255],
+            [10, 11],
+            [0, 10]
+        );
+    }
+
+    /**
+     *
+     * @dataProvider changeFileSize
+     */
+    public function testChangeFileSizeReturn($fileSize, $newFileSize)
+    {
+
+        $fileObject = $this->getFileObject();
+        $fileObject->ftruncate(0);
+        $string = str_repeat('A', $fileSize);
+        $fileObject->fwrite($string);
+        $expected = $newFileSize - $fileSize;
+        $actual = $fileObject->makeFileLonger($newFileSize);
+        $this->assertEquals($expected, $actual);
+    }
+
+    /**
+     *
+     * @dataProvider changeFileSize
+     */
+    public function testChangeFileSizeSize($fileSize, $newFileSize)
+    {
+        $fileObject = $this->getFileObject();
+        $fileObject->ftruncate(0);
+        $string = str_repeat('A', $fileSize);
+        $fileObject->fwrite($string);
+        $fileObject->makeFileLonger($newFileSize);
+        $expected = $newFileSize;
+        $fileObject->fseekWithCheck(0, SEEK_END);
+        $actual = $fileObject->ftell();
+        $this->assertEquals($expected, $actual);
+    }
+
+    /**
+     *
+     * @dataProvider changeFileSize
+     */
+    public function testChangeFileSizeSizeWithSmallBuffer($fileSize, $newFileSize)
+    {
+        $fileObject = $this->getFileObject();
+        $fileObject->setMaxBufferSize(3);
+        $fileObject->ftruncate(0);
+        $string = str_repeat('A', $fileSize);
+        $fileObject->fwrite($string);
+        $fileObject->makeFileLonger($newFileSize);
+        $expected = $newFileSize;
+        $fileObject->fseekWithCheck(0, SEEK_END);
+        $actual = $fileObject->ftell();
+        $this->assertEquals($expected, $actual);
+    }
+
+    public function testChangeFileSizeWrong()
+    {
+        $fileObject = $this->getFileObject();
+        $fileObject->setMaxBufferSize(3);
+        $fileObject->ftruncate(0);
+        $string = str_repeat('A', 10);
+        $fileObject->fwrite($string);
+        $this->assertFalse($fileObject->makeFileLonger(5));
+        $expected = 10;
+        $fileObject->fseekWithCheck(0, SEEK_END);
+        $actual = $fileObject->ftell();
+        $this->assertEquals($expected, $actual);
+    }
+
 }

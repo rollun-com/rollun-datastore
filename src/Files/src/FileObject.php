@@ -110,7 +110,21 @@ class FileObject extends Rfc\Spl\SplFileObject
         return 0;
     }
 
+    public function fwriteWithCheck($string, $length = null)
+    {
+        $lengthForWrite = is_null($length) ? strlen($string) : $length;
+        if ($lengthForWrite > strlen($string)) {
+            throw new \InvalidArgumentException('$length = ' . $length . " bigger then   = strlen('$string')");
+        }
+        $writedLength = $this->fwrite($string, $lengthForWrite);
+        if ($writedLength !== $lengthForWrite) {
+            throw new \RuntimeException('Error writing $string = ' . $string . " in file: \n" . $this->getRealPath());
+        }
+        return $writedLength;
+    }
+
     /**
+     * If $beforeLinePos = null string append to the end
      *
      * @param string $insertedString string for insert. \n will be added if not exist.
      * @param type $beforeLinePos zero based line number. null for uppend to the end of file.
@@ -120,7 +134,7 @@ class FileObject extends Rfc\Spl\SplFileObject
         $insertedString = rtrim($insertedString, "\r\n") . "\n";
         if (is_null($beforeLinePos)) {
             $this->fseekWithCheck(0, SEEK_END);
-            $this->fwrite($insertedString);
+            $this->fwriteWithCheck($insertedString);
             return;
         }
 
@@ -135,8 +149,21 @@ class FileObject extends Rfc\Spl\SplFileObject
         $newCharPos = $charPosFrom + strlen($insertedString);
         $this->moveForward($charPosFrom, $newCharPos);
         $this->fseekWithCheck($charPosFrom);
-        $this->fwrite($insertedString);
+        $this->fwriteWithCheck($insertedString);
         $this->restoreFlags($flags);
+    }
+
+    public function makeFileLonger($newFileSize, $placeholderChar = ' ')
+    {
+        $this->fseekWithCheck(0, SEEK_END);
+        $fileSize = $this->ftell();
+        if ($fileSize >= $newFileSize) {
+            return false;
+        }
+        $flags = $this->clearFlags();
+        $chenges = $this->changeFileSize($newFileSize, $placeholderChar);
+        $this->restoreFlags($flags);
+        return $chenges;
     }
 
     /**
@@ -176,6 +203,7 @@ class FileObject extends Rfc\Spl\SplFileObject
     {
         $this->fseekWithCheck(0, SEEK_END);
         $fileSize = $this->ftell();
+        $changes = $this->changeFileSize($fileSize + $newCharPos - $charPosFrom);
         $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $fileSize ? $fileSize - $charPosFrom : $this->getMaxBufferSize();
         $charPosForRead = $fileSize - $bufferSize;
         $charPosForWrite = $fileSize + $newCharPos - $charPosFrom - $bufferSize;
@@ -183,7 +211,7 @@ class FileObject extends Rfc\Spl\SplFileObject
             $this->fseekWithCheck($charPosForRead);
             $buffer = $this->fread($bufferSize);
             $this->fseekWithCheck($charPosForWrite);
-            $this->fwrite($buffer);
+            $this->fwriteWithCheck($buffer);
             $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $charPosForRead ? $charPosForRead - $charPosFrom : $this->getMaxBufferSize();
             $charPosForRead = $charPosForRead - $bufferSize;
             $charPosForWrite = $charPosForWrite - $bufferSize;
@@ -202,11 +230,50 @@ class FileObject extends Rfc\Spl\SplFileObject
             $buffer = $this->fread($bufferSize);
             $charPosFrom = $this->ftell();
             $this->fseekWithCheck($newCharPos);
-            $this->fwrite($buffer);
+            $this->fwriteWithCheck($buffer);
             $newCharPos = $this->ftell();
         }
         $this->fflush();
-        $this->ftruncate($newCharPos);
+        $this->changeFileSize($newCharPos);
+    }
+
+    /**
+     *
+     * @param int $newFileSize
+     * @param string $placeholderChar if $newFileSize > $this->fileeSithe()
+     * @param int $oldFileSize - do not set this fild!
+     * @return int
+     * @throws \RuntimeException
+     */
+    protected function changeFileSize($newFileSize, $placeholderChar = ' ', $oldFileSize = null)
+    {
+        $this->fseekWithCheck(0, SEEK_END);
+        $fileSize = $this->ftell();
+        if ($newFileSize === $fileSize) {
+            return 0;
+        }
+
+        if ($newFileSize < $fileSize) {
+            $this->ftruncate($newFileSize);
+            return $newFileSize - $fileSize;
+        }
+
+        $oldFileSize = $oldFileSize ?? $fileSize;
+        $addQuantity = $this->getMaxBufferSize() < ($newFileSize - $fileSize) ?
+                $this->getMaxBufferSize() :
+                $newFileSize - $fileSize;
+        $string = str_repeat($placeholderChar, $addQuantity);
+        $this->fwriteWithCheck($string);
+        $this->fseekWithCheck(0, SEEK_END);
+        $currentFileSize = $this->ftell();
+        if ($currentFileSize == $fileSize) {
+            throw new \RuntimeException("Error changeFileSize to $newFileSize bytes  \n in file: \n" . $this->getRealPath());
+        }
+        if ($currentFileSize == $newFileSize) {
+            return $newFileSize - $oldFileSize;
+        } else {
+            $this->changeFileSize($newFileSize, $placeholderChar);
+        }
     }
 
 }

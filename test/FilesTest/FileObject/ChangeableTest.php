@@ -114,11 +114,29 @@ class ChangeableTest extends AbstractTest
             [1, 6, '012345', '01234512345'],
             [0, 6, '012345', '012345012345'],
             [0, 1, '012345', '0012345'],
-            [0, 7, '012345', "012345\n012345"],
-            [0, 10, '012345', pack('a10a6', "012345\n", "012345\n")],
+            [0, 10, '012345', "012345\n   012345"],
             [0, 3, "012345678", '012012345678'],
+            [0, 7, '012345', "012345\n012345"],
+            [0, 4, "0123456789ABCD", "01230123456789ABCD"],
             [0, 4, "0123456789ABCD", "01230123456789ABCD"],
         );
+    }
+
+    /**
+     *
+     * @param int $maxIndex
+     * @param int $indexForDelete
+     * @dataProvider moveSubStrProvider
+     */
+    public function MoveSubStrInWeb()
+    {
+        $strs = $this->moveSubStrProvider();
+        foreach ($strs as $key => $value) {
+
+            $testResulr = $this->testMoveSubStr($value[0], $value[1], $value[2], $value[3]);
+
+            echo("\n=============================\n<br>\n<br>");
+        }
     }
 
     /**
@@ -130,13 +148,26 @@ class ChangeableTest extends AbstractTest
     public function testMoveSubStr($charPosFrom, $newCharPos, $string, $expected)
     {
         $fileObject = $this->getFileObject();
+        $fileObject->lock(LOCK_EX);
         $this->fillFile($fileObject, [$string]);
         $fileObject->moveSubStr($charPosFrom, $newCharPos);
-        $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
+
+        //$fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
+        $fileObject->fseekWithCheck(0, SEEK_END);
+        $fileSize = $fileObject->ftell();
         $fileObject->fseek(0);
-        $stringAfterMove = $fileObject->fread($fileObject->getSize());
+        $stringAfterMove = $fileObject->fread($fileSize);
+
+        $fileObject->unlock();
         unset($fileObject);
-        $this->assertEquals($expected, rtrim($stringAfterMove, "\n"));
+        $actual = rtrim($stringAfterMove, "\n");
+        if (php_sapi_name() === 'cli') {
+            $this->assertEquals($expected, $actual);
+        } else {
+            echo(((string) (int) (trim($expected) == trim($actual))) . "  !!!!!! \n<br>");
+            $res = "\n<br>" . $expected . '       ' . $actual . "\n<br>";
+            echo($res);
+        }
     }
 
     public function insertStringProvider()
@@ -162,8 +193,10 @@ class ChangeableTest extends AbstractTest
         $this->fillFile($fileObject, $strings);
         $fileObject->insertString($insertedString, $beforeLinePos);
         $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
+        $fileObject->fseek(0, SEEK_END);
+        $fileSize = $fileObject->ftell();
         $fileObject->fseek(0);
-        $stringAfterInsert = $fileObject->fread($fileObject->getSize());
+        $stringAfterInsert = $fileObject->fread($fileSize);
         unset($fileObject);
         $this->assertEquals($expected, rtrim($stringAfterInsert, "\n"));
     }
