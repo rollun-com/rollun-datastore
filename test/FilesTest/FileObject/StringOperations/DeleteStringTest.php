@@ -7,39 +7,38 @@ use rollun\test\files\FileObject\StringOperations\StringOperationsAbstractTest;
 class DeleteStringTest extends StringOperationsAbstractTest
 {
 
-//
-//    public function deleteStringProvider()
-//    {
-//        //$stringsArray, $stringNumber
-//        $stringsArray = $this->specialStringsPrvider();
-//        $stringsArrays = $this->cyclicShifts($stringsArray);
-//        $stringNumbersArray = $this->stringsNumbersProvider($stringsArray);
-//
-//        foreach ($stringsArrays as $stringsArray) {
-//            foreach ($stringNumbersArray as $stringNumber) {
-//                $providedData[] = [$stringsArray, $stringNumber];
-//            }
-//        }
-//        return $providedData;
-//    }
-//
-//    /**
-//     *
-//     * @dataProvider deleteStringProvider
-//     */
-//    public function testDeleteString($stringsArray, $stringNumber)
-//    {
-//        $fileObject = $this->getFileObject();
-//        $this->writeStringsToFile($fileObject, $stringsArray);
-//        $fileObject->deleteString($stringNumber);
-//        $fileSize = $fileObject->getFileSize();
-//        $fileObject->fseekWithCheck(0);
-//        $actualString = $fileObject->fread($fileSize);
-//        unset($stringsArray[$stringNumber]);
-//        $expectedString = implode("\n", $stringsArray);
-//
-//        $this->assertEquals($expectedString, $actualString);
-//    }
+    public function deleteStringProvider()
+    {
+        //$stringsArray, $stringNumber
+        $stringsArray = $this->specialStringsPrvider();
+        $stringsArrays = $this->cyclicShifts($stringsArray);
+        $stringNumbersArray = $this->stringsNumbersProvider($stringsArray);
+
+        foreach ($stringsArrays as $stringsArray) {
+            foreach ($stringNumbersArray as $stringNumber) {
+                $providedData[] = [$stringsArray, $stringNumber];
+            }
+        }
+        return $providedData;
+    }
+
+    /**
+     *
+     * @dataProvider deleteStringProvider
+     */
+    public function testDeleteString($stringsArray, $stringNumber)
+    {
+        $fileObject = $this->getFileObject();
+        $this->writeStringsToFile($fileObject, $stringsArray);
+        $fileObject->deleteString($stringNumber);
+        $fileSize = $fileObject->getFileSize();
+        $fileObject->fseekWithCheck(0);
+        $actualString = $fileObject->fread($fileSize);
+        unset($stringsArray[$stringNumber]);
+        $expectedString = implode("\n", $stringsArray) . "\n";
+
+        $this->assertEquals($expectedString, $actualString);
+    }
 
     public function deleteStringExceptionProvider()
     {
@@ -65,10 +64,10 @@ class DeleteStringTest extends StringOperationsAbstractTest
 
     public function eolProvider()
     {
-        //$indexForDelete, $stringsArray, $expectedString
+        //$indexForDelete, $stringInFile, $expectedString
         return array(
             [0, "0", ""], [0, "\n", ""], [0, "0\n1", "1"], [1, "0\n1", "0\n"], [0, "0\n", ""],
-//            [0, ["0", "1", "2"], "1\n2"], [0, ["", "1", "2"], "1\n2"], [1, ["0", "1", "2"], "0\n2"], [2, ["0", "1", "2"], "0\n1"], [0, ["0", "1", ""], "1\n"],
+            [0, "0\n1\n2", "1\n2"], [0, "\n1\n2", "1\n2"], [1, "0\n1\n2", "0\n2"], [2, "0\n1\n2", "0\n1\n"], [0, "0\n1\n", "1\n"],
         );
     }
 
@@ -107,9 +106,9 @@ class DeleteStringTest extends StringOperationsAbstractTest
         for ($index = 0; $index <= $maxIndex; $index++) {
             $stringArray[] = str_repeat($index, rand(1, 1000)); // rand(1, 100)//1 + $maxIndex - $index   rand(1, 1000)
         }
-        $strings = implode("\n", $stringArray);
+        $strings = implode("\n", $stringArray) . "\n";
         unset($stringArray[$indexForDelete]);
-        $expected = implode("\n", $stringArray);
+        $expected = implode("\n", $stringArray) . "\n";
 
         $fileObject = $this->getFileObject();
         $fileObject->fwrite($strings);

@@ -58,30 +58,35 @@ class InsertStringTest extends StringOperationsAbstractTest
         $this->assertEquals($expectedString, $actualString);
     }
 
-    public function getFileSizeProvider()
+    public function insertStringProvider()
     {
-        //$stringInFile, $expectedFileSize
+        //$strings, $insertedString, $beforeLinePos, $expected
         return array(
-            ["", 0],
-            ["\n", 1],
-            ["0", 1],
-            ["0\n", 2],
-            ["\n\n", 2],
-            ["\n1\n", 3],
-            ["1234567890", 10],
+            [['012345'], 'ABC', 1, "012345\nABC"],
+            [['012345'], 'ABC', 0, "ABC\n012345"],
+            [['012345', '543210'], 'ABC', 1, "012345\nABC\n543210"],
+            [['012345', '543210'], 'ABC', 0, "ABC\n012345\n543210"],
         );
     }
 
     /**
      *
-     * @dataProvider getFileSizeProvider
+     * @param int $maxIndex
+     * @param int $indexForDelete
+     * @dataProvider insertStringProvider
      */
-    public function testGetFileSize($stringInFile, $expectedFileSize)
+    public function testInsertString($strings, $insertedString, $beforeLinePos, $expected)
     {
         $fileObject = $this->getFileObject();
-        $fileObject->fwriteWithCheck($stringInFile);
-        $actualFileSize = $fileObject->getFileSize();
-        $this->assertEquals($actualFileSize, $expectedFileSize);
+        $this->writeStringsToFile($fileObject, $strings);
+        $fileObject->insertString($insertedString, $beforeLinePos);
+        $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
+        $fileObject->fseek(0, SEEK_END);
+        $fileSize = $fileObject->ftell();
+        $fileObject->fseek(0);
+        $stringAfterInsert = $fileObject->fread($fileSize);
+        unset($fileObject);
+        $this->assertEquals($expected, rtrim($stringAfterInsert, "\n"));
     }
 
 }

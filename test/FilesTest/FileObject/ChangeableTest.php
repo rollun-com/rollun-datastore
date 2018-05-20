@@ -7,7 +7,7 @@ class ChangeableTest extends AbstractTest
 
     public function moveSubStrProvider()
     {
-        //$charPosFrom, $newCharPos, $string, $expected
+        //$charPosFrom, $newCharPos, $stringInFile, $expected
         return array(
             [3, 1, '012345', '0345'],
             [5, 0, '012345', '5'],
@@ -25,102 +25,65 @@ class ChangeableTest extends AbstractTest
     }
 
     /**
-     *
-     * @param int $maxIndex
-     * @param int $indexForDelete
      * @dataProvider moveSubStrProvider
      */
-    public function testMoveSubStr($charPosFrom, $newCharPos, $string, $expected)
+    public function testMoveSubStr($charPosFrom, $newCharPos, $stringInFile, $expected)
     {
         $fileObject = $this->getFileObject();
-        $fileObject->lock(LOCK_EX);
-        $this->writeStringsToFile($fileObject, [$string]);
+        $fileObject->fwriteWithCheck($stringInFile);
         $fileObject->moveSubStr($charPosFrom, $newCharPos);
-        $fileObject->fseekWithCheck(0, SEEK_END);
-        $fileSize = $fileObject->ftell();
         $fileObject->fseek(0);
-        $stringAfterMove = $fileObject->fread($fileSize);
-
-        $fileObject->unlock();
-        unset($fileObject);
-        $actual = rtrim($stringAfterMove, "\n");
+        $actual = $fileObject->fread(100);
         $this->assertEquals($expected, $actual);
     }
 
-    public function insertStringProvider()
+    public function truncateWithCheckProvider()
     {
-        //$strings, $insertedString, $beforeLinePos, $expected
+        //$stringInFile, $newSize, $expectedString
         return array(
-            //[['012345'], 'ABC', 1, "012345\nABC"],
-            [['012345'], 'ABC', 0, "ABC\n012345"],
-            [['012345', '543210'], 'ABC', 1, "012345\nABC\n543210"],
-            [['012345', '543210'], 'ABC', 0, "ABC\n012345\n543210"],
+            ["123", 0, ""], ["123", 1, "1"], ["123", 2, "12"], ["123", 3, "123"],
+            ["\n", 0, ""], ["\n", 1, "\n"],
         );
     }
 
     /**
-     *
-     * @param int $maxIndex
-     * @param int $indexForDelete
-     * @dataProvider insertStringProvider
+     * @dataProvider truncateWithCheckProvider
      */
-    public function testInsertString($strings, $insertedString, $beforeLinePos, $expected)
+    public function testTruncateWithCheck($stringInFile, $newSize, $expectedString)
     {
         $fileObject = $this->getFileObject();
-        $this->writeStringsToFile($fileObject, $strings);
-        $fileObject->insertString($insertedString, $beforeLinePos);
-        $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
-        $fileObject->fseek(0, SEEK_END);
-        $fileSize = $fileObject->ftell();
-        $fileObject->fseek(0);
-        $stringAfterInsert = $fileObject->fread($fileSize);
-        unset($fileObject);
-        $this->assertEquals($expected, rtrim($stringAfterInsert, "\n"));
+
+        $fileObject->fwriteWithCheck($stringInFile);
+        $fileObject->truncateWithCheck($newSize);
+        $fileObject->fseekWithCheck(0);
+        $actualString = $fileObject->fread(10);
+        $this->assertEquals($expectedString, $actualString);
     }
 
-    public function rewriteStringProvider()
+    public function getFileSizeProvider()
     {
-        //$newStrings, $inLinePos
+        //$stringInFile, $expectedFileSize
         return array(
-            ["012345", 1],
-            ["", 1],
-            ["012345", 0],
             ["", 0],
-            ["012345", 3],
-            ["", 3],
-            ["012345", 5],
-            ["", 5],
-                //["012345", 6],
+            ["\n", 1],
+            ["0", 1],
+            ["0\n", 2],
+            ["\n\n", 2],
+            ["\n1\n", 3],
+            ["1234567890", 10],
         );
     }
 
     /**
      *
-     * @dataProvider rewriteStringProvider
+     * @dataProvider getFileSizeProvider
      */
-    public function testRewriteString($newString, $inLinePos)
+    public function testGetFileSize($stringInFile, $expectedFileSize)
     {
         $fileObject = $this->getFileObject();
-        $strings = [
-            'aaa',
-            'bbbb',
-            'cc',
-            '',
-            "d\nd"
-        ];
-        $this->writeStringsToFile($fileObject, $strings);
-        $fileObject->rewriteString($newString, $inLinePos);
-        $fileObject = new \SplFileObject($fileObject->getRealPath(), 'r');
-        if ($inLinePos === 0) {
-            $fileObject->rewind();
-        } else {
-            $fileObject->seek($inLinePos - 1);
-            $fileObject->current();
-        }
-        $actual = $fileObject->fgets();
-        $expected = rtrim($newString, "\r\n") . "\n";
-        last - != \n
-        $this->assertEquals($expected, $actual);
+        $fileObject->fwriteWithCheck($stringInFile);
+        $actualFileSize = $fileObject->getFileSize();
+        $this->assertEquals($actualFileSize, $expectedFileSize);
     }
 
 }

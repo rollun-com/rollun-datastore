@@ -110,7 +110,7 @@ class FlagsTest extends AbstractTest
         $string = str_repeat('A', $fileSize);
         $fileObject->fwrite($string);
         $expected = $newFileSize - $fileSize;
-        $actual = $fileObject->makeFileLonger($newFileSize);
+        $actual = $fileObject->truncateWithCheck($newFileSize);
         $this->assertEquals($expected, $actual);
     }
 
@@ -124,7 +124,7 @@ class FlagsTest extends AbstractTest
         $fileObject->ftruncate(0);
         $string = str_repeat('A', $fileSize);
         $fileObject->fwrite($string);
-        $fileObject->makeFileLonger($newFileSize);
+        $fileObject->truncateWithCheck($newFileSize);
         $expected = $newFileSize;
         $fileObject->fseekWithCheck(0, SEEK_END);
         $actual = $fileObject->ftell();
@@ -142,7 +142,7 @@ class FlagsTest extends AbstractTest
         $fileObject->ftruncate(0);
         $string = str_repeat('A', $fileSize);
         $fileObject->fwrite($string);
-        $fileObject->makeFileLonger($newFileSize);
+        $fileObject->truncateWithCheck($newFileSize);
         $expected = $newFileSize;
         $fileObject->fseekWithCheck(0, SEEK_END);
         $actual = $fileObject->ftell();
@@ -156,8 +156,7 @@ class FlagsTest extends AbstractTest
         $fileObject->ftruncate(0);
         $string = str_repeat('A', 10);
         $fileObject->fwrite($string);
-        $this->expectException(\InvalidArgumentException::class);
-        $this->assertFalse($fileObject->makeFileLonger(5));
+        $this->assertEquals(-5, $fileObject->truncateWithCheck(5));
     }
 
     public function testSize()

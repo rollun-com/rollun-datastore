@@ -55,7 +55,7 @@ abstract class AbstractTest extends \PHPUnit_Framework_TestCase
         }
         $fileObject->fseek(0, SEEK_END);
         $fileSize = $fileObject->ftell();
-        $fileObject->ftruncate($fileSize - 1); //delete last EOL
+        //$fileObject->ftruncate($fileSize - 1); //delete last EOL
         $fileObject->fseek(0);
     }
 

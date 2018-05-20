@@ -49,9 +49,9 @@ abstract class StringOperationsAbstractTest extends AbstractTest
             case 2:
                 return[0, 1];
             case 3:
-                return[0, 1, 3];
+                return[0, 1, 2];
         }
-        return[0, 1, $count - 1, $count];
+        return[0, 1, 2, $count - 1];
     }
 
     protected function getRndString($maxlength = 1000)

@@ -23,7 +23,7 @@ class LockTest extends AbstractTest
     {
         parent::setUp();
         $fileObject = $this->getFileObject();
-        $this->fillFile($fileObject, ["first string \n second string"]);
+        $fileObject->fwriteWithCheck("first string \n second string");
         $filename = $fileObject->getRealPath();
         unset($fileObject);
         $this->fileObject1 = new FileObject($filename);
