@@ -29,7 +29,7 @@ class FileObject extends Rfc\Spl\SplFileObject
     public function __construct($filename)
     {
         parent::__construct($filename, 'c+');
-        $this->setFlags(\SplFileObject::READ_AHEAD); //| \SplFileObject::DROP_NEW_LINE | \SplFileObject::READ_AHEAD |\SplFileObject: \SplFileObject::SKIP_EMPTY
+        $this->setFlags(\SplFileObject::READ_AHEAD | \SplFileObject::READ_CSV); //| \SplFileObject::DROP_NEW_LINE | \SplFileObject::READ_AHEAD |\SplFileObject: \SplFileObject::SKIP_EMPTY | \SplFileObject::READ_CSV
         $this->setMaxBufferSize(static::DELAULT_MAX_BUFFER_SIZE);
         $this->lockTriesTimeout = static::DELAULT_LOCK_TRIES_TIMEOUT;
         $this->maxLockTries = static::DELAULT_MAX_LOCK_TRIES;
@@ -84,8 +84,31 @@ class FileObject extends Rfc\Spl\SplFileObject
         return $this->flock(LOCK_UN);
     }
 
+    public function getStringsCount()
+    {
+        if ($this->getFileSize() === 0) {
+            return 0;
+        }
+        $flags = $this->clearFlags();
+        $this->seek(PHP_INT_MAX);
+        $key = $this->key();
+        $this->fseekWithCheck(-1, SEEK_END);
+        $lastChar = $this->fread(1);
+        $shift = $lastChar === "\n" ? 0 : 1;
+        $stringsCount = $key + $shift;
+        $this->restoreFlags($flags);
+        return $stringsCount;
+    }
+
     public function deleteString($linePos)
     {
+        $stringsCount = $this->getStringsCount();
+        if ($linePos + 1 > $stringsCount) {
+            throw new \InvalidArgumentException(
+            '$stringsCount = ' . $stringsCount . " lower then \$linePos  = strlen('$linePos') "
+            . " in file: \n" . $this->getRealPath()
+            );
+        }
         $flags = $this->clearFlags();
         if ($linePos === 0) {
             $this->rewind();
@@ -96,8 +119,13 @@ class FileObject extends Rfc\Spl\SplFileObject
             $newCharPos = $this->ftell();
             $this->next();
         }
-        $this->current();
+        $deletedString = $this->current();
+        $isItLastString = rtrim($deletedString, "\n") === $deletedString;
+
         $charPosFrom = $this->ftell();
+        $newCharPos = ($newCharPos > 0 && $isItLastString) ? $newCharPos - 1 : $newCharPos;
+//        $this->next();
+//        $isItLastString =    !$this->valid();
         $this->moveBackward($charPosFrom, $newCharPos);
         $this->restoreFlags($flags);
     }
@@ -105,7 +133,7 @@ class FileObject extends Rfc\Spl\SplFileObject
     public function fseekWithCheck($offset, $whence = SEEK_SET)
     {
         if ($this->fseek($offset, $whence) == -1) {
-            throw new \RuntimeException('$charPosForRead =' . $charPosForRead . " in file: \n" . $this->getRealPath());
+            throw new \RuntimeException('Can not fseek to $offset = ' . $offset . "\n in file: \n" . $this->getRealPath());
         }
         return 0;
     }
@@ -114,7 +142,10 @@ class FileObject extends Rfc\Spl\SplFileObject
     {
         $lengthForWrite = is_null($length) ? strlen($string) : $length;
         if ($lengthForWrite > strlen($string)) {
-            throw new \InvalidArgumentException('$length = ' . $length . " bigger then   = strlen('$string')");
+            throw new \InvalidArgumentException(
+            '$length = ' . $length . " bigger then   = strlen('$string') "
+            . " in file: \n" . $this->getRealPath()
+            );
         }
         $writedLength = $this->fwrite($string, $lengthForWrite);
         if ($writedLength !== $lengthForWrite) {
@@ -123,7 +154,7 @@ class FileObject extends Rfc\Spl\SplFileObject
         return $writedLength;
     }
 
-    public function size()
+    public function getFileSize()
     {
         $position = $this->ftell();
         $this->fseekWithCheck(0, SEEK_END);
@@ -141,15 +172,27 @@ class FileObject extends Rfc\Spl\SplFileObject
     public function insertString($insertedString, $beforeLinePos = null)
     {
         $insertedString = rtrim($insertedString, "\r\n") . "\n";
-        if (is_null($beforeLinePos)) {
+
+        $stringsCount = $this->getStringsCount();
+        if ($stringsCount === 0 && ( is_null($beforeLinePos) || $beforeLinePos === 0)) {
+
             $this->fseekWithCheck(0, SEEK_END);
             $this->fwriteWithCheck($insertedString);
+            return;
+        }
+
+        if (is_null($beforeLinePos)) {
+            $this->fseekWithCheck(-1, SEEK_END);
+            $lastChar = $this->fread(1);
+            $prefix = $lastChar === "\n" ? '' : "\n";
+            $this->fwriteWithCheck($prefix . $insertedString);
             return;
         }
 
         $flags = $this->clearFlags();
         if ($beforeLinePos === 0) {
             $charPosFrom = 0;
+            $this->seek($beforeLinePos);
         } else {
             $this->seek($beforeLinePos - 1);
             $this->current();
@@ -179,7 +222,7 @@ class FileObject extends Rfc\Spl\SplFileObject
             $this->current();
             $charPosStart = $this->ftell();
         }
-        $oldString = $this->current();
+        $this->current();
         if ($this->eof()) {
             throw new \InvalidArgumentException(
             '$inLinePos = ' . $inLinePos . " bigger then max index\n in file: \n" . $this->getRealPath()
@@ -195,12 +238,28 @@ class FileObject extends Rfc\Spl\SplFileObject
 
     public function makeFileLonger($newFileSize, $placeholderChar = ' ')
     {
-        $fileSize = $this->size();
-        if ($fileSize >= $newFileSize) {
-            return false;
+        $fileSize = $this->getFileSize();
+        if ($fileSize > $newFileSize) {
+            throw new \InvalidArgumentException(
+            '$newFileSize = ' . $newFileSize . " smaller then $fileSize\n in file: \n" . $this->getRealPath()
+            );
         }
         $flags = $this->clearFlags();
         $chenges = $this->changeFileSize($newFileSize, $placeholderChar);
+        $this->restoreFlags($flags);
+        return $chenges;
+    }
+
+    public function makeFileShorter($newFileSize)
+    {
+        $fileSize = $this->getFileSize();
+        if ($fileSize < $newFileSize) {
+            throw new \InvalidArgumentException(
+            '$newFileSize = ' . $newFileSize . " bigger then $fileSize\n in file: \n" . $this->getRealPath()
+            );
+        }
+        $flags = $this->clearFlags();
+        $chenges = $this->changeFileSize($newFileSize);
         $this->restoreFlags($flags);
         return $chenges;
     }
@@ -229,7 +288,7 @@ class FileObject extends Rfc\Spl\SplFileObject
     protected function clearFlags()
     {
         $flagsForRestore = $this->getFlags();
-        $this->setFlags(0);
+        $this->setFlags($flagsForRestore & \SplFileObject::READ_CSV);
         return $flagsForRestore;
     }
 
@@ -240,7 +299,7 @@ class FileObject extends Rfc\Spl\SplFileObject
 
     protected function moveForward($charPosFrom, $newCharPos)
     {
-        $fileSize = $this->size();
+        $fileSize = $this->getFileSize();
         $changes = $this->changeFileSize($fileSize + $newCharPos - $charPosFrom);
         $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $fileSize ? $fileSize - $charPosFrom : $this->getMaxBufferSize();
         $charPosForRead = $fileSize - $bufferSize;
@@ -259,7 +318,7 @@ class FileObject extends Rfc\Spl\SplFileObject
 
     protected function moveBackward($charPosFrom, $newCharPos)
     {
-        $fileSize = $this->size();
+        $fileSize = $this->getFileSize();
         $this->fseekWithCheck($charPosFrom);
         while ($charPosFrom < $fileSize) {
             $this->fseekWithCheck($charPosFrom);
@@ -284,13 +343,16 @@ class FileObject extends Rfc\Spl\SplFileObject
      */
     protected function changeFileSize($newFileSize, $placeholderChar = ' ', $oldFileSize = null)
     {
-        $fileSize = $this->size();
+        $fileSize = $this->getFileSize();
         if ($newFileSize === $fileSize) {
             return 0;
         }
 
         if ($newFileSize < $fileSize) {
-            $this->ftruncate($newFileSize);
+            $success = $this->ftruncate($newFileSize);
+            if (!$success) {
+                throw new \RuntimeException("Error changeFileSize to $newFileSize bytes  \n in file: \n" . $this->getRealPath());
+            }
             return $newFileSize - $fileSize;
         }
 
@@ -301,7 +363,7 @@ class FileObject extends Rfc\Spl\SplFileObject
         $string = str_repeat($placeholderChar, $addQuantity);
         $this->fseekWithCheck(0, SEEK_END);
         $this->fwriteWithCheck($string);
-        $currentFileSize = $this->size();
+        $currentFileSize = $this->getFileSize();
         if ($currentFileSize == $fileSize) {
             throw new \RuntimeException("Error changeFileSize to $newFileSize bytes  \n in file: \n" . $this->getRealPath());
         }

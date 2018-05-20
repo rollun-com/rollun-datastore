@@ -66,6 +66,27 @@ class FlagsTest extends AbstractTest
         $this->assertEquals($expected, $savedRows);
     }
 
+    public function testEolInCSV()
+    {
+        $string = " \"it is tow string in regular txt file," . "\n " . "but one string in csv file\" ";
+
+        $fileObject = $this->getFileObject();
+        $fileObject->fwrite($string);
+
+        //regular txt file
+        $fileObject->setFlags(0);
+        $expected = 2; //strings Count
+        $actual = $fileObject->getStringsCount();
+        $this->assertEquals($expected, $actual);
+
+        // csv file
+        $fileObject->rewind();
+        $fileObject->setFlags(\SplFileObject::READ_CSV);
+        $expected = 1; //strings Count
+        $actual = $fileObject->getStringsCount();
+        $this->assertEquals($expected, $actual);
+    }
+
     public function changeFileSize()
     {
         //$fileSize, $newFileSize
@@ -135,21 +156,18 @@ class FlagsTest extends AbstractTest
         $fileObject->ftruncate(0);
         $string = str_repeat('A', 10);
         $fileObject->fwrite($string);
+        $this->expectException(\InvalidArgumentException::class);
         $this->assertFalse($fileObject->makeFileLonger(5));
-        $expected = 10;
-        $fileObject->fseekWithCheck(0, SEEK_END);
-        $actual = $fileObject->ftell();
-        $this->assertEquals($expected, $actual);
     }
 
     public function testSize()
     {
         $fileObject = $this->getFileObject();
-        $this->assertEquals(0, $fileObject->size());
+        $this->assertEquals(0, $fileObject->getFileSize());
         $string = str_repeat('A', 10);
         $fileObject->fwrite($string);
         $fileObject->fseekWithCheck(0);
-        $this->assertEquals(10, $fileObject->size());
+        $this->assertEquals(10, $fileObject->getFileSize());
     }
 
 }

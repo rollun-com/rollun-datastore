@@ -4,7 +4,7 @@ namespace rollun\test\files\FileObject;
 
 use rollun\files\FileObject;
 
-class FileObjectLockTest extends AbstractTest
+class LockTest extends AbstractTest
 {
 
     /**
@@ -23,7 +23,7 @@ class FileObjectLockTest extends AbstractTest
     {
         parent::setUp();
         $fileObject = $this->getFileObject();
-        $this->fillFile($fileObject, ['FileObjectLockTest']);
+        $this->fillFile($fileObject, ["first string \n second string"]);
         $filename = $fileObject->getRealPath();
         unset($fileObject);
         $this->fileObject1 = new FileObject($filename);
@@ -65,7 +65,7 @@ class FileObjectLockTest extends AbstractTest
         //$lockMode LOCK_SH or LOCK_EX
         $this->fileObject1->lock(LOCK_SH);
         $this->assertTrue($this->fileObject2->lock(LOCK_SH));
-        $this->expectException(\Exception::class);
+        $this->expectException(\RuntimeException::class);
         $this->fileObject2->lock(LOCK_EX);
     }
 
@@ -73,10 +73,18 @@ class FileObjectLockTest extends AbstractTest
     {
         //$lockMode LOCK_SH or LOCK_EX
         $this->assertTrue($this->fileObject1->flock(LOCK_EX));
-        $this->expectException(\Exception::class);
         $this->fileObject2->rewind();
-        $this->fileObject2->fseek(0);
-        $this->assertFalse($this->fileObject2->current());
+        $this->fileObject2->next();
+        $actual = $this->fileObject2->current();
+        $this->assertFalse($actual);
+        $actual = $this->fileObject2->key();
+        $this->fileObject2->next();
+        $actual = $this->fileObject2->current();
+        $this->assertFalse($actual);
+        $this->fileObject2->rewind();
+        $this->fileObject2->current();
+        $this->expectException(\RuntimeException::class);
+        $this->fileObject2->fgets();
     }
 
 }
