@@ -2,9 +2,9 @@
 
 namespace rollun\test\files\FileObject\StringOperations;
 
-use rollun\test\files\FileObject\AbstractTest;
+use rollun\test\files\FileObject\FileObjectAbstractTest;
 
-abstract class StringOperationsAbstractTest extends AbstractTest
+abstract class StringOperationsAbstractTest extends FileObjectAbstractTest
 {
 
     protected function specialStringsPrvider()

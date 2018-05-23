@@ -3,8 +3,9 @@
 namespace rollun\test\files\FileObject;
 
 use rollun\files\FileObject;
+use rollun\test\files\FileObject\FileObjectAbstractTest;
 
-class LockTest extends AbstractTest
+class LockTest extends FileObjectAbstractTest
 {
 
     /**

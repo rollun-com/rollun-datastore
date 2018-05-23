@@ -8,7 +8,7 @@ class FileObject extends Rfc\Spl\SplFileObject
 {
 
     const DELAULT_LOCK_TRIES_TIMEOUT = 50; //in ms
-    const DELAULT_MAX_LOCK_TRIES = 40;
+    const DELAULT_MAX_LOCK_TRIES = 20 * 10;
 
     /**
      * Buffer size in  bytes for coping operation
@@ -33,7 +33,6 @@ class FileObject extends Rfc\Spl\SplFileObject
         $this->setMaxBufferSize(static::DELAULT_MAX_BUFFER_SIZE);
         $this->lockTriesTimeout = static::DELAULT_LOCK_TRIES_TIMEOUT;
         $this->maxLockTries = static::DELAULT_MAX_LOCK_TRIES;
-        $this->currentLockMode = 0;
     }
 
     public function __destruct()
@@ -279,83 +278,6 @@ class FileObject extends Rfc\Spl\SplFileObject
     protected function restoreFlags($flagsForRestore)
     {
         $this->setFlags($flagsForRestore);
-    }
-
-    protected function moveForward($charPosFrom, $newCharPos)
-    {
-        $fileSize = $this->getFileSize();
-        $changes = $this->changeFileSize($fileSize + $newCharPos - $charPosFrom);
-        $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $fileSize ? $fileSize - $charPosFrom : $this->getMaxBufferSize();
-        $charPosForRead = $fileSize - $bufferSize;
-        $charPosForWrite = $fileSize + $newCharPos - $charPosFrom - $bufferSize;
-        while ($bufferSize > 0) {
-            $this->fseekWithCheck($charPosForRead);
-            $buffer = $this->fread($bufferSize);
-            $this->fseekWithCheck($charPosForWrite);
-            $this->fwriteWithCheck($buffer);
-            $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $charPosForRead ? $charPosForRead - $charPosFrom : $this->getMaxBufferSize();
-            $charPosForRead = $charPosForRead - $bufferSize;
-            $charPosForWrite = $charPosForWrite - $bufferSize;
-        }
-        $this->fflush();
-    }
-
-    protected function moveBackward($charPosFrom, $newCharPos)
-    {
-        $fileSize = $this->getFileSize();
-        $this->fseekWithCheck($charPosFrom);
-        while ($charPosFrom < $fileSize) {
-            $this->fseekWithCheck($charPosFrom);
-            $bufferSize = ($charPosFrom + $this->getMaxBufferSize()) > $fileSize ? $fileSize - $charPosFrom : $this->getMaxBufferSize();
-            $buffer = $this->fread($bufferSize);
-            $charPosFrom = $this->ftell();
-            $this->fseekWithCheck($newCharPos);
-            $this->fwriteWithCheck($buffer);
-            $newCharPos = $this->ftell();
-        }
-        $this->fflush();
-        $this->changeFileSize($newCharPos);
-    }
-
-    /**
-     *
-     * @param int $newFileSize
-     * @param string $placeholderChar if $newFileSize > $this->fileeSithe()
-     * @param int $oldFileSize - do not set this fild!
-     * @return int
-     * @throws \RuntimeException
-     */
-    protected function changeFileSize($newFileSize, $placeholderChar = ' ', $oldFileSize = null)
-    {
-        $fileSize = $this->getFileSize();
-        if ($newFileSize === $fileSize) {
-            return 0;
-        }
-
-        if ($newFileSize < $fileSize) {
-            $success = $this->ftruncate($newFileSize);
-            if (!$success) {
-                throw new \RuntimeException("Error changeFileSize to $newFileSize bytes \n in file: \n" . $this->getRealPath());
-            }
-            return $newFileSize - $fileSize;
-        }
-
-        $oldFileSize = $oldFileSize ?? $fileSize;
-        $addQuantity = $this->getMaxBufferSize() < ($newFileSize - $fileSize) ?
-                $this->getMaxBufferSize() :
-                $newFileSize - $fileSize;
-        $string = str_repeat($placeholderChar, $addQuantity);
-        $this->fseekWithCheck(0, SEEK_END);
-        $this->fwriteWithCheck($string);
-        $currentFileSize = $this->getFileSize();
-        if ($currentFileSize == $fileSize) {
-            throw new \RuntimeException("Error changeFileSize to $newFileSize bytes \n in file: \n" . $this->getRealPath());
-        }
-        if ($currentFileSize == $newFileSize) {
-            return $newFileSize - $oldFileSize;
-        } else {
-            $this->changeFileSize($newFileSize, $placeholderChar);
-        }
     }
 
 }

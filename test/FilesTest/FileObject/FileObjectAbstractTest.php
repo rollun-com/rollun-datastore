@@ -2,35 +2,13 @@
 
 namespace rollun\test\files\FileObject;
 
+use rollun\test\files\FilesAbstractTest;
 use rollun\files\FileObject;
 use rollun\files\FileManager;
 use rollun\installer\Command;
 
-abstract class AbstractTest extends \PHPUnit_Framework_TestCase
+abstract class FileObjectAbstractTest extends FilesAbstractTest
 {
-
-    protected function makeDirName()
-    {
-        $fileManager = new FileManager;
-        $dataDir = Command::getDataDir();
-        $pathArray = explode('\\', strtolower(__NAMESPACE__));
-        array_shift($pathArray);
-        $subDir = implode('/', $pathArray);
-        $dirName = $fileManager->joinPath($dataDir, $subDir);
-        return $dirName;
-    }
-
-    protected function makeFileName()
-    {
-        $name = pathinfo($name = get_class($this) . '.txt')['basename'];
-        return $name;
-    }
-
-    protected function makeFullFileName()
-    {
-        $name = pathinfo($name = get_class($this) . '.txt')['basename'];
-        return $name;
-    }
 
     protected function getFileObject($flags = 0)
     {

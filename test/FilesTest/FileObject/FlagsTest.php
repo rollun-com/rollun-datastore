@@ -2,7 +2,9 @@
 
 namespace rollun\test\files\FileObject;
 
-class FlagsTest extends AbstractTest
+use rollun\test\files\FileObject\FileObjectAbstractTest;
+
+class FlagsTest extends FileObjectAbstractTest
 {
 
     public function stringsRowProvider()
@@ -94,7 +96,8 @@ class FlagsTest extends AbstractTest
             [1, 1],
             [10, 255],
             [10, 11],
-            [0, 10]
+            [0, 9],
+            [0, 10],
         );
     }
 
