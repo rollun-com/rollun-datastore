@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @copyright Copyright © 2014 Rollun LC (http://rollun.com/)
  * @license LICENSE.md New BSD License
@@ -11,10 +12,8 @@ use rollun\datastore\DataStore\ConditionBuilder\SqlConditionBuilder;
 use rollun\datastore\Rql\RqlQuery;
 use rollun\datastore\TableGateway\DbSql\MultiInsertSql;
 use rollun\datastore\TableGateway\SqlQueryBuilder;
-use Xiag\Rql\Parser\Node\LimitNode;
 use Xiag\Rql\Parser\Node\Query\ArrayOperator\InNode;
 use Xiag\Rql\Parser\Query;
-use Zend\Db\Adapter\Driver\ResultInterface;
 use Zend\Db\Adapter\ParameterContainer;
 use Zend\Db\Sql\Select;
 use Zend\Db\Sql\Sql;
@@ -70,7 +69,9 @@ class DbTable extends DataStoreAbstract
         $adapter->getDriver()->getConnection()->beginTransaction();
 
         try {
-            $insertedItem = $this->insertItem($itemData, $rewriteIfExist);
+            $insertedItem = !$rewriteIfExist ?
+                $this->insertItem($itemData) : $this->upserItem($itemData);
+
             $adapter->getDriver()->getConnection()->commit();
         } catch (\Throwable $e) {
             $adapter->getDriver()->getConnection()->rollback();
@@ -79,6 +80,73 @@ class DbTable extends DataStoreAbstract
 
         return $insertedItem;
     }
+
+
+    /**
+     * @param $item
+     */
+    protected function upserItem($item)
+    {
+        $id = $item[$this->getIdentifier()];
+
+        $adapter = $this->dbTable->getAdapter();
+
+        $valTemplate = '';
+        foreach (array_values($item) as $_) {
+            $valTemplate .= '?,';
+        }
+        $valTemplate = trim($valTemplate, ",");
+
+        $upsertTemplate = '';
+        foreach ($item as $key => $_) {
+            $upsertTemplate .= "{$adapter->getPlatform()->quoteIdentifier($key)} = ?,";
+        }
+        $upsertTemplate = trim($upsertTemplate, ",");
+
+        $vals = array_merge(array_values($item), array_values($item));
+
+        $keys = implode(',', array_map([$adapter->getPlatform(), 'quoteIdentifier'], array_keys($item)));
+
+        $sqlString = "INSERT INTO " .
+            $adapter->getPlatform()->quoteIdentifier($this->dbTable->getTable())
+            . "(" . $keys . ") "
+            . "VALUES ({$valTemplate})"
+            . "ON DUPLICATE KEY UPDATE $upsertTemplate";
+
+        $statement = $adapter->getDriver()->createStatement($sqlString);
+        $statement->setParameterContainer(new ParameterContainer($vals));
+        $statement->execute();
+
+        return $this->read($id);
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @param array $item
+     * @return array|mixed|null
+     * @throws DataStoreException
+     */
+    public function rewrite($item)
+    {
+        if (!isset($item[$this->getIdentifier()])) {
+            throw new DataStoreException('Item must has primary key');
+        }
+        $adapter = $this->dbTable->getAdapter();
+        $adapter->getDriver()->getConnection()->beginTransaction();
+
+        try {
+            $result = $this->updateItem($item);
+
+            $adapter->getDriver()->getConnection()->commit();
+        } catch (\Throwable $e) {
+            $adapter->getDriver()->getConnection()->rollback();
+            throw new DataStoreException("[{$this->dbTable->getTable()}]Can't upsert item. {$e->getMessage()}", 0, $e);
+        }
+
+        return $result;
+    }
+
 
     /**
      * @param $itemData
@@ -140,10 +208,12 @@ class DbTable extends DataStoreAbstract
      */
     public function queriedDelete(Query $query)
     {
-        if ($query->getLimit()
+        if (
+            $query->getLimit()
             || $query->getSort()
             || ($query instanceof RqlQuery && $query->getGroupBy())
-            || $query->getSelect()) {
+            || $query->getSelect()
+        ) {
             throw new InvalidArgumentException('Only where clause allowed for delete');
         }
 
@@ -193,10 +263,12 @@ class DbTable extends DataStoreAbstract
      */
     public function queriedUpdate($record, Query $query)
     {
-        if ($query->getLimit()
+        if (
+            $query->getLimit()
             || $query->getSort()
             || ($query instanceof RqlQuery && $query->getGroupBy())
-            || $query->getSelect()) {
+            || $query->getSelect()
+        ) {
             throw new InvalidArgumentException('Only where clause allowed for update');
         }
 
